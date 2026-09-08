@@ -24,9 +24,9 @@ namespace Locm
         /// <summary>Желаемое число карт по стоимости 0..7+ в колоде из 30 (по средней колоде Legend: 0.6 1.6 6.4 5.3 5.8 3.5 3.0 3.6).</summary>
         public static double[] TargetCurve = { 0.6, 1.6, 6.4, 5.3, 5.8, 3.5, 3.0, 3.6 };
         // Совпадение с пиками Legend (88k пиков): 0 → 86.5%, 0.1 → 86.4%, 0.6 → 75.7%. Малая поправка почти бесплатна и страхует от колод из одних 6+.
-        public static double CurveW = 0.1;
+        public static double CurveW = 0.201;
         public static int MaxItems = 8;
-        public static double ItemOverPenalty = 3.0;
+        public static double ItemOverPenalty = 3.045;
         public static int MaxSameCard = 2;          // третья копия одной карты — штраф
         public static double SameCardPenalty = 0.0; // Legend третью копию не избегает: со штрафом 1.5 совпадение с их пиками падает на 2%
         /// <summary>Разведка для статистики из self-play: с этой вероятностью пик случайный (0 — выключено).</summary>

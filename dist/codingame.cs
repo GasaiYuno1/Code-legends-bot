@@ -11,28 +11,28 @@ namespace Locm
 public sealed class Evaluator
 {
 public const double WinScore = 1e6;
-public double AttackW = 0.957;
-public double DefenseW = 0.657;
-public double GuardW = 0.792;
-public double GuardDefW = 0.007;
-public double WardW = 1.114;
-public double WardAtkW = 0.48;
-public double LethalW = 2.078;
-public double DrainAtkW = 0.222;
-public double BreakthroughAtkW = 0.055;
-public double ChargeW = 0.195;
-public double Fragile1W = 0.013;
-public double Fragile2W = 0.0;
-public double BlueHandW = 0.146;
-public double HpW = 0.102;
-public double LowHpW = 0.968;
+public double AttackW = 0.909;
+public double DefenseW = 0.632;
+public double GuardW = 0.71;
+public double GuardDefW = 0.0;
+public double WardW = 1.295;
+public double WardAtkW = 0.487;
+public double LethalW = 2.423;
+public double DrainAtkW = 0.247;
+public double BreakthroughAtkW = 0.06;
+public double ChargeW = 0.174;
+public double Fragile1W = 0.01;
+public double Fragile2W = 0.036;
+public double BlueHandW = 0.329;
+public double HpW = 0.122;
+public double LowHpW = 0.966;
 public int LowHp = 10;
-public double MidHpW = 0.047;
+public double MidHpW = 0.101;
 public int MidHp = 20;
-public double HandCardW = 1.363;
-public double HandRatingW = 0.094;
-public double OppDrawW = 1.489;
-public double MyDrawW = 1.51;
+public double HandCardW = 1.645;
+public double HandRatingW = 0.157;
+public double OppDrawW = 1.492;
+public double MyDrawW = 1.708;
 public double Creature(in Creature c)
 {
 double v = c.Attack * AttackW + c.Defense * DefenseW;
@@ -393,7 +393,7 @@ public double NetScale = 10.0;
 public bool NetAdditive = false;
 public bool NetDeepOnly = true;
 private readonly NetEval _net = new NetEval();
-public double ReplyWeight = 0.9;
+public double ReplyWeight = 0.95;
 public int MaxCandidates = 1024;
 public double Phase1Share = 0.6;
 public int DeepReplyCandidates = 32;
@@ -1492,7 +1492,7 @@ else v -= c.OpponentHealthChange * OppDamageW;
 v += c.MyHealthChange * MyHealW;
 return v;
 }
-public static double SelfW = 20.0;
+public static double SelfW = 27.51;
 public static double Rate(Card c)
 {
 if (UseTable && CardTable.Picks > 0 && c.Number > 0 && c.Number < CardTable.Rating.Length)
@@ -1567,9 +1567,9 @@ public int Pick(TurnInput input, IReadOnlyList<Card> alreadyPicked) => 0;
 public sealed class RatingDraft : IDraftStrategy
 {
 public static double[] TargetCurve = { 0.6, 1.6, 6.4, 5.3, 5.8, 3.5, 3.0, 3.6 };
-public static double CurveW = 0.1;
+public static double CurveW = 0.201;
 public static int MaxItems = 8;
-public static double ItemOverPenalty = 3.0;
+public static double ItemOverPenalty = 3.045;
 public static int MaxSameCard = 2;
 public static double SameCardPenalty = 0.0;
 public static double Explore = 0.0;

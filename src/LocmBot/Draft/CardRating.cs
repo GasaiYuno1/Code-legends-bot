@@ -60,7 +60,7 @@ namespace Locm
         }
 
         /// <summary>Вес поправки из self-play (CardTable.SelfPlay: вклад карты в винрейт колоды); 0 — только таблица пиков.</summary>
-        public static double SelfW = 20.0;   // self-play 40k колод: 10/20/40 против 0 — 53.2/53.4/53.5% по 2000 партий; совпадение с пиками Legend 89.1% → 85.6%
+        public static double SelfW = 27.51;   // self-play 40k колод: 10/20/40 против 0 — 53.2/53.4/53.5% по 2000 партий; совпадение с пиками Legend 89.1% → 85.6%
 
         public static double Rate(Card c)
         {

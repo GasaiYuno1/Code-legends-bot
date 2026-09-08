@@ -11,28 +11,28 @@ namespace Locm
     {
         public const double WinScore = 1e6;
 
-        public double AttackW = 0.957;
-        public double DefenseW = 0.657;
-        public double GuardW = 0.792;
-        public double GuardDefW = 0.007;      // Guard тем ценнее, чем толще
-        public double WardW = 1.114;
-        public double WardAtkW = 0.48;        // Ward на большой атаке — почти гарантированный размен
-        public double LethalW = 2.078;
-        public double DrainAtkW = 0.222;
-        public double BreakthroughAtkW = 0.055;
-        public double ChargeW = 0.195;
-        public double Fragile1W = 0.013;       // штраф существу с защитой 1 (умирает от чего угодно)
-        public double Fragile2W = 0.0;       // штраф существу с защитой 2
-        public double BlueHandW = 0.146;       // синий предмет с уроном в руке — запас на летал
-        public double HpW = 0.102;             // за 1 HP. SPSA self-play (120 итераций по 1000 партий) — лучший вектор 58.4% против прежних дефолтов. Арена (A/B, только этот вес): 0.1 → 65.5% и 17-е место, 0.3 → 59.1% и 20-е; офлайн-метрики (совпадение с Legend 54.0% против 55.4%) здесь ошиблись
-        public double LowHpW = 0.968;          // дополнительно за 1 HP ниже LowHp
+        public double AttackW = 0.909;
+        public double DefenseW = 0.632;
+        public double GuardW = 0.71;
+        public double GuardDefW = 0.0;      // Guard тем ценнее, чем толще
+        public double WardW = 1.295;
+        public double WardAtkW = 0.487;        // Ward на большой атаке — почти гарантированный размен
+        public double LethalW = 2.423;
+        public double DrainAtkW = 0.247;
+        public double BreakthroughAtkW = 0.06;
+        public double ChargeW = 0.174;
+        public double Fragile1W = 0.01;       // штраф существу с защитой 1 (умирает от чего угодно)
+        public double Fragile2W = 0.036;       // штраф существу с защитой 2
+        public double BlueHandW = 0.329;       // синий предмет с уроном в руке — запас на летал
+        public double HpW = 0.122;             // за 1 HP. SPSA self-play: раунд 1 — 56.9% на 4000 партиях против прежних дефолтов (арена: 1-е место), раунд 2 (+параметры драфта) — ещё 53.1% на 4000 против раунда 1. Арена (A/B, только этот вес): 0.1 → 65.5% и 17-е место, 0.3 → 59.1% и 20-е; офлайн-метрики (совпадение с Legend 54.0% против 55.4%) здесь ошиблись
+        public double LowHpW = 0.966;          // дополнительно за 1 HP ниже LowHp
         public int LowHp = 10;
-        public double MidHpW = 0.047;          // дополнительно за 1 HP ниже MidHp (зона, где начинается гонка)
+        public double MidHpW = 0.101;          // дополнительно за 1 HP ниже MidHp (зона, где начинается гонка)
         public int MidHp = 20;
-        public double HandCardW = 1.363;       // карта в руке (не разыгранная) — базовая ценность
-        public double HandRatingW = 0.094;     // плюс доля рейтинга карты (CardRating): сильные карты и removal держать дороже
-        public double OppDrawW = 1.489;        // каждая лишняя карта противника за пробитые руны
-        public double MyDrawW = 1.51;         // мой лишний добор (эффекты карт)
+        public double HandCardW = 1.645;       // карта в руке (не разыгранная) — базовая ценность
+        public double HandRatingW = 0.157;     // плюс доля рейтинга карты (CardRating): сильные карты и removal держать дороже
+        public double OppDrawW = 1.492;        // каждая лишняя карта противника за пробитые руны
+        public double MyDrawW = 1.708;         // мой лишний добор (эффекты карт)
 
         public double Creature(in Creature c)
         {
