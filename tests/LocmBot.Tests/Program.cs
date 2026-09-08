@@ -34,7 +34,8 @@ namespace Locm.Tests
                 var overrides = new System.Collections.Generic.List<string>();
                 for (int i = 1; i < args.Length; i++)
                 {
-                    if (args[i].StartsWith("limit=")) limit = int.Parse(args[i].Substring(6));
+                    if (args[i].StartsWith("dump=")) Compare.DumpExamples = int.Parse(args[i].Substring(5));
+                    else if (args[i].StartsWith("limit=")) limit = int.Parse(args[i].Substring(6));
                     else if (args[i].StartsWith("step=")) step = int.Parse(args[i].Substring(5));
                     else if (args[i].Contains("=")) overrides.Add(args[i]);
                     else paths.Add(args[i]);

@@ -59,6 +59,16 @@ namespace Locm
         public int SampledHands = 2;
         /// <summary>Лимит узлов полного хода противника на один образец.</summary>
         public int SampledNodes = 400;
+        /// <summary>Лимит узлов точной проверки летала атаками (только в лицо и по Guard); 0 — только эвристика.</summary>
+        public int ExactLethalNodes = 0;   // 200: точный перебор атак в лицо/по Guard подтверждает эвристику; self-play 388:412 (шум) — оставлена эвристика, проверенная ареной
+        /// <summary>Сколько лучших кандидатов после глубокого ответа проверить на риск летала по картам противника; 0 — выключено.</summary>
+        public int LethalRiskCandidates = 0;
+        /// <summary>Число образцов руки противника для риска летала.</summary>
+        public int LethalRiskHands = 4;
+        /// <summary>Лимит узлов поиска летала на образец (только действия, ведущие к урону в лицо).</summary>
+        public int LethalRiskNodes = 300;
+        /// <summary>Штраф за долю образцов с леталом (1.0 = летал во всех образцах).</summary>
+        public double LethalRiskW = 30.0;
         /// <summary>Бюджет прогрева JIT на первом ходу драфта, мс (0 — без прогрева; для быстрых локальных матчей).</summary>
         public int WarmUpMs = 400;
         /// <summary>Сколько лучших кандидатов после глубокого ответа оценить ещё и моим следующим ходом (3 полухода); 0 — выключено.</summary>
@@ -81,11 +91,14 @@ namespace Locm
         private readonly GameState _sampledBest = new GameState();
         private readonly Card[][] _hands = new Card[8][];
         private readonly int[] _handLen = new int[8];
+        private int _preparedHands;
         private ulong _rng;
         /// <summary>Модель колоды/руки противника (тройки драфта + показанные карты).</summary>
         public readonly OpponentModel Opponent = new OpponentModel();
         private int _sampledPlayer;
         private Evaluator _sampledEval;
+        private bool _lethalOnly;
+        public int RiskScored { get; private set; }
         private readonly GameState[] _cPool = new GameState[MaxDepth + 2];
         private readonly List<GameAction>[] _cLegal = new List<GameAction>[MaxDepth + 1];
         private readonly HashSet<ulong> _cVisited = new HashSet<ulong>();
@@ -204,6 +217,7 @@ namespace Locm
             DeepRescored = 0;
             CounterScored = 0;
             SampledScored = 0;
+            RiskScored = 0;
             _visited.Clear();
             if (!ReferenceEquals(root, _pool[0])) _pool[0].CopyFrom(root);
             int me = _pool[0].Current;
@@ -453,6 +467,44 @@ namespace Locm
                 }
                 if (bestIdx < 0) return;
 
+                // уровень 3б: риск летала по картам противника — доля образцов его руки, в которых он выигрывает следующим ходом
+                if (LethalRiskCandidates > 0 && LethalRiskHands > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver
+                    && _heap[bestIdx].State.Players[1 - me].HandCount + 1 > 0)
+                {
+                    int k = Math.Min(deepDone, LethalRiskCandidates);
+                    for (int i = 0; i < k; i++)
+                    {
+                        int best = i;
+                        for (int j = i + 1; j < deepDone; j++) if (_final[order[j]] > _final[order[best]]) best = j;
+                        int t = order[i]; order[i] = order[best]; order[best] = t;
+                    }
+                    PrepareHands(_heap[order[0]].State, me, LethalRiskHands);
+                    double bestR = double.NegativeInfinity;
+                    int bestRIdx = -1;
+                    for (int i = 0; i < k; i++)
+                    {
+                        if (_clock.TimeUp) { TimedOut = true; break; }
+                        Candidate c = _heap[order[i]];
+                        double f = _final[order[i]];
+                        if (f > -Evaluator.WinScore / 2 && f < Evaluator.WinScore / 2)
+                        {
+                            f -= LethalRiskW * LethalRisk(c.State, me);
+                            _final[order[i]] = f;
+                            RiskScored++;
+                        }
+                        if (f > bestR)
+                        {
+                            bestR = f;
+                            bestRIdx = order[i];
+                        }
+                    }
+                    if (bestRIdx >= 0)
+                    {
+                        bestFinal = bestR;
+                        bestIdx = bestRIdx;
+                    }
+                }
+
                 // уровень 3а: лучшие после глубокого ответа — полный ход противника с сэмплированной рукой (expectimax)
                 if (SampledCandidates > 0 && SampledHands > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver)
                 {
@@ -463,7 +515,7 @@ namespace Locm
                         for (int j = i + 1; j < deepDone; j++) if (_final[order[j]] > _final[order[best]]) best = j;
                         int t = order[i]; order[i] = order[best]; order[best] = t;
                     }
-                    PrepareHands(_heap[order[0]].State, me);
+                    PrepareHands(_heap[order[0]].State, me, SampledHands);
                     double bestS = double.NegativeInfinity;
                     int bestSIdx = -1;
                     for (int i = 0; i < k; i++)
@@ -554,7 +606,8 @@ namespace Locm
             int guardDefense = 0;
             for (int i = 0; i < p.BoardCount; i++)
                 if (p.Board[i].Has(Abilities.Guard)) guardDefense += p.Board[i].Defense;
-            if (totalAttack - guardDefense >= p.Health) return -Evaluator.WinScore;
+            // эвристика ошибается при Ward/Lethal/Breakthrough у стражей — подтверждаем точным перебором атак в лицо и по Guard
+            if (totalAttack - guardDefense >= p.Health && (ExactLethalNodes == 0 || AttackLethal(after, me, ExactLethalNodes))) return -Evaluator.WinScore;
 
             // порядок: по убыванию атаки
             int n = o.BoardCount;
@@ -605,6 +658,14 @@ namespace Locm
             s.EndTurn();
             if (s.IsOver) return Leaf(s, me);
             int opp = s.Current;
+            // точный летал атаками (перебор по OppEval с лимитом узлов может его не найти)
+            if (ExactLethalNodes > 0 && AttackLethal(after, me, ExactLethalNodes))
+            {
+                _replyBest.CopyFrom(_sampledBest);
+                _oppBestLen = Math.Min(_cBestLen, _oppBestLine.Length);
+                Array.Copy(_cBestLine, _oppBestLine, _oppBestLen);
+                return Leaf(_sampledBest, me);
+            }
             _oppVisited.Clear();
             _oppVisited.Add(s.Hash());
             _oppNodes = 0;
@@ -684,7 +745,7 @@ namespace Locm
         /// <summary>Итоговая оценка позиции после моего хода по модели с сэмплированной рукой (для диагностики).</summary>
         public double SampledFinal(GameState after, int me)
         {
-            PrepareHands(after, me);
+            PrepareHands(after, me, SampledHands);
             double st = UseNet ? Leaf(after, me) : Eval.Score(after, me);
             return ReplyWeight * SampledReplyScore(after, me) + (1 - ReplyWeight) * st;
         }
@@ -694,7 +755,7 @@ namespace Locm
         {
             into.Clear();
             if (after.IsOver) return;
-            PrepareHands(after, me);
+            PrepareHands(after, me, SampledHands);
             SampledReplyScore(after, me);
             for (int i = 0; i < _fullBestLen; i++) into.Add(_fullBestLine[i]);
         }
@@ -702,11 +763,12 @@ namespace Locm
         // ---------------------------------------------------------------- полный ход противника с сэмплированной рукой
 
         /// <summary>Образцы руки противника на этот ход: карты по силе из таблицы Legend-пиков; одни и те же для всех кандидатов.</summary>
-        private void PrepareHands(GameState anyCandidate, int me)
+        private void PrepareHands(GameState anyCandidate, int me, int hands)
         {
             _rng = (ulong)anyCandidate.Players[1 - me].HandCount * 0x9E3779B97F4A7C15UL + 0x2545F4914F6CDD1DUL + (ulong)anyCandidate.Turn;
             int n = Math.Min(8, anyCandidate.Players[1 - me].HandCount + 1);   // +1: карта, которую он доберёт
-            for (int k = 0; k < SampledHands && k < _hands.Length; k++)
+            _preparedHands = Math.Min(hands, _hands.Length);
+            for (int k = 0; k < _preparedHands; k++)
             {
                 if (_hands[k] == null || _hands[k].Length != n) _hands[k] = new Card[n];
                 int got = Opponent.Sample(ref _rng, _hands[k], n, 1000 + k * 16);
@@ -723,7 +785,7 @@ namespace Locm
             if (after.IsOver) return Leaf(after, me);
             double sum = 0;
             int samples = 0;
-            for (int k = 0; k < SampledHands && k < _hands.Length && _hands[k] != null; k++)
+            for (int k = 0; k < _preparedHands && _hands[k] != null; k++)
             {
                 var s = _cPool[0];
                 s.CopyFrom(after);
@@ -752,6 +814,159 @@ namespace Locm
         }
 
         /// <summary>
+        /// Риск летала по картам: доля подготовленных образцов руки противника, в которых после моего хода он выигрывает
+        /// своим следующим ходом. Поиск только по действиям, ведущим к урону в лицо (Charge/урон при призыве, предметы в лицо
+        /// и по моим Guard, баффы готовых атаковать, атаки в лицо и по Guard); атаки с существующего стола без карт
+        /// уже учтены глубоким ответом, здесь важны карты.
+        /// </summary>
+        public double LethalRisk(GameState after, int me)
+        {
+            if (after.IsOver) return after.Winner == me ? 0.0 : 1.0;
+            int lethal = 0, samples = 0;
+            for (int k = 0; k < _preparedHands && _hands[k] != null; k++)
+            {
+                var s = _cPool[0];
+                s.CopyFrom(after);
+                s.EndTurn();
+                samples++;
+                if (s.IsOver) { if (s.Winner != me) lethal++; continue; }
+                int opp = s.Current;
+                var o = s.Players[opp];
+                o.HandKnown = 0;
+                int give = Math.Min(o.HandCount, _handLen[k]);
+                for (int i = 0; i < give; i++) o.Hand[o.HandKnown++] = _hands[k][i];
+                _cVisited.Clear();
+                _cVisited.Add(s.Hash());
+                _cNodes = 0;
+                _cRootBoard = o.BoardCount;
+                _sampledPlayer = opp;
+                _sampledEval = OppEval;
+                _cBest = OppEval.Score(s, opp);
+                _cBestLen = 0;
+                _sampledBest.CopyFrom(s);
+                _lethalOnly = true;
+                FullDfs(0, ActionType.Pass, opp, LethalRiskNodes);
+                _lethalOnly = false;
+                if (_sampledBest.IsOver && _sampledBest.Winner == opp)
+                {
+                    lethal++;
+                    _fullBestLen = _cBestLen;
+                    Array.Copy(_cBestLine, _fullBestLine, _cBestLen);
+                }
+            }
+            return samples == 0 ? 0.0 : (double)lethal / samples;
+        }
+
+        /// <summary>
+        /// Точная проверка летала атаками с его стола (без карт): перебор только атак в лицо и по моим Guard,
+        /// с дедупликацией и лимитом узлов. Состояние after — после моего хода, до его EndTurn.
+        /// </summary>
+        public bool AttackLethal(GameState after, int me, int nodeCap)
+        {
+            if (after.IsOver) return after.Winner != me;
+            var s = _cPool[0];
+            s.CopyFrom(after);
+            s.EndTurn();
+            if (s.IsOver) return s.Winner != me;
+            int opp = s.Current;
+            var o = s.Players[opp];
+            o.HandKnown = 0;
+            _cVisited.Clear();
+            _cVisited.Add(s.Hash());
+            _cNodes = 0;
+            _cRootBoard = o.BoardCount;
+            _sampledPlayer = opp;
+            _sampledEval = OppEval;
+            _cBest = OppEval.Score(s, opp);
+            _cBestLen = 0;
+            _sampledBest.CopyFrom(s);
+            _lethalOnly = true;
+            FullDfs(0, ActionType.Pass, opp, nodeCap);
+            _lethalOnly = false;
+            return _sampledBest.IsOver && _sampledBest.Winner == opp;
+        }
+
+        /// <summary>Эвристика уровня 1: сумма его атак минус защита моих Guard ≥ моё HP (после его EndTurn).</summary>
+        public bool GreedyLethal(GameState after, int me)
+        {
+            if (after.IsOver) return after.Winner != me;
+            var s = _cPool[0];
+            s.CopyFrom(after);
+            s.EndTurn();
+            if (s.IsOver) return s.Winner != me;
+            var o = s.Players[s.Current];
+            var p = s.Players[me];
+            int totalAttack = 0;
+            for (int i = 0; i < o.BoardCount; i++) totalAttack += o.Board[i].Attack;
+            int guardDefense = 0;
+            for (int i = 0; i < p.BoardCount; i++)
+                if (p.Board[i].Has(Abilities.Guard)) guardDefense += p.Board[i].Defense;
+            return totalAttack - guardDefense >= p.Health;
+        }
+
+        /// <summary>Диагностика: подготовленные образцы руки противника и последняя найденная линия летала.</summary>
+        public string DescribeRisk()
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int k = 0; k < _preparedHands; k++)
+            {
+                sb.Append("   hand ").Append(k).Append(':');
+                for (int i = 0; i < _handLen[k]; i++) sb.Append(' ').Append(_hands[k][i].Number).Append('/').Append(_hands[k][i].Cost).Append('m');
+                sb.AppendLine();
+            }
+            sb.Append("   lethal line:");
+            for (int i = 0; i < _fullBestLen; i++) sb.Append(' ').Append(_fullBestLine[i]).Append(';');
+            sb.AppendLine();
+            return sb.ToString();
+        }
+
+        /// <summary>Риск летала по картам с подготовкой образцов руки (для тестов и диагностики).</summary>
+        public double LethalRiskScore(GameState after, int me)
+        {
+            PrepareHands(after, me, LethalRiskHands);
+            return LethalRisk(after, me);
+        }
+
+        /// <summary>Действие игрока player, которое может приблизить летал (для _lethalOnly).</summary>
+        private static bool LethalUseful(GameState s, GameAction a, int player)
+        {
+            var p = s.Players[player];
+            var enemy = s.Players[1 - player];
+            switch (a.Type)
+            {
+                case ActionType.Summon:
+                {
+                    int h = p.FindHand(a.Id);
+                    if (h < 0) return false;
+                    var c = p.Hand[h];
+                    return (c.Abilities & Abilities.Charge) != 0 || c.OpponentHealthChange < 0;
+                }
+                case ActionType.Attack:
+                {
+                    if (a.Target < 0) return true;
+                    int t = enemy.FindCreature(a.Target);
+                    return t >= 0 && enemy.Board[t].Has(Abilities.Guard);
+                }
+                case ActionType.Use:
+                {
+                    int h = p.FindHand(a.Id);
+                    if (h < 0) return false;
+                    var c = p.Hand[h];
+                    if (c.Type == CardType.GreenItem)
+                    {
+                        int t = p.FindCreature(a.Target);
+                        return t >= 0 && p.Board[t].CanAttack && !p.Board[t].HasAttacked;
+                    }
+                    if (a.Target < 0) return c.Type == CardType.BlueItem;
+                    int e = enemy.FindCreature(a.Target);
+                    return e >= 0 && enemy.Board[e].Has(Abilities.Guard);
+                }
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
         /// Ограниченный перебор полного хода игрока player (фазы как в основном поиске), лучший узел по _sampledEval → _sampledBest.
         /// Дети по убыванию оценки — при лимите узлов это важнее ширины; массивы _children свободны после фазы 1.
         /// </summary>
@@ -768,6 +983,7 @@ namespace Locm
             {
                 GameAction a = legal[i];
                 if (a.IsPass || !CounterAllowed(last, a.Type, s)) continue;
+                if (_lethalOnly && !LethalUseful(s, a, player)) continue;
                 if (_cNodes >= nodeCap) break;
                 child.CopyFrom(s);
                 child.Apply(a);

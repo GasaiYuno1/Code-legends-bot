@@ -25,7 +25,7 @@ namespace Locm.Tests
             var search = new SearchBattle();
             Tuning.Apply(overrides, search, Console.Out);
             int turns = 0, same = 0, theirsBetter = 0, mineBetter = 0, theirsWin = 0, mineWin = 0;
-            long maxMs = 0, sumMs = 0; int timedOut = 0, sampledTotal = 0, modelTurns = 0, modelMismatch = 0;
+            long maxMs = 0, sumMs = 0; int timedOut = 0, sampledTotal = 0, riskTotal = 0, modelTurns = 0, modelMismatch = 0;
             double sumDiff = 0;
             var files = new List<string>();
             foreach (var p in paths)
@@ -63,6 +63,7 @@ namespace Locm.Tests
                     if (sw.ElapsedMilliseconds > maxMs) maxMs = sw.ElapsedMilliseconds;
                     sumMs += sw.ElapsedMilliseconds;
                     sampledTotal += search.SampledScored;
+                    riskTotal += search.RiskScored;
                     if (search.TimedOut) timedOut++;
                     var afterMine = s.Clone();
                     afterMine.ApplySequence(mine);
@@ -95,7 +96,7 @@ namespace Locm.Tests
             Console.WriteLine($"  my move better (>0.5):    {mineBetter,6} ({Pct(mineBetter, turns)})  <- eval disagrees with Legend");
             Console.WriteLine($"  lethal found: theirs {theirsWin}, mine {mineWin}");
             Console.WriteLine($"  mean(my - their) on non-lethal turns: {sumDiff / Math.Max(1, turns):F2}");
-            Console.WriteLine($"  time: avg {(double)sumMs / Math.Max(1, turns):F1} ms, max {maxMs} ms, timed out {timedOut}; sampled rescored {sampledTotal}");
+            Console.WriteLine($"  time: avg {(double)sumMs / Math.Max(1, turns):F1} ms, max {maxMs} ms, timed out {timedOut}; sampled rescored {sampledTotal}, risk checked {riskTotal}");
             Console.WriteLine($"  opponent model: deck known on {modelTurns} turns, unknown-count mismatch {modelMismatch}");
             return 0;
         }
@@ -117,6 +118,11 @@ namespace Locm.Tests
             files.Sort(StringComparer.Ordinal);
             var predicted = new List<GameAction>();
             int turns = 0, sameSet = 0, creatures = 0, targetMatch = 0, seen = 0;
+            var riskCount = new int[5];
+            var riskDied = new int[5];
+            int riskTurns = 0, riskActual = 0, riskDumped = 0, attackLethalTurns = 0, attackLethalDied = 0, exactTurns = 0, exactDied = 0, lethalDumped = 0;
+            var lethalTable = new int[8];
+            double riskSum = 0;
             foreach (var f in files)
             {
                 if (turns >= limit) break;
@@ -134,7 +140,49 @@ namespace Locm.Tests
                     if (s.IsOver) continue;
                     if (seen++ % step != 0) continue;
                     s.ApplySequence(GameAction.ParseSequence(battle[i].Answer));
-                    if (s.IsOver || s.Opp.BoardCount == 0) continue;
+                    if (s.IsOver) continue;
+                    if (search.LethalRiskCandidates > 0)
+                    {
+                        // калибровка риска летала: предсказанная доля против факта (следующий ввод — я мёртв)
+                        double risk = search.LethalRiskScore(s, 0);
+                        var next = GameState.FromInput(battle[i + 1].Input);
+                        bool died = next.Players[0].Health <= 0;
+                        bool deepLethal = search.DeepReplyScore(s, 0) < -Evaluator.WinScore / 2;
+                        bool greedy = search.GreedyLethal(s, 0);
+                        bool exact = search.AttackLethal(s, 0, 400);
+                        lethalTable[(greedy ? 4 : 0) + (deepLethal ? 2 : 0) + (exact ? 1 : 0)]++;
+                        if (exact) { exactTurns++; if (died) exactDied++; }
+                        if (greedy != exact && lethalDumped < DumpExamples)
+                        {
+                            lethalDumped++;
+                            Console.WriteLine($"==== {Path.GetFileName(f)} turn {i}: greedy {greedy}, deep {deepLethal}, exact {exact}, died {died}");
+                            Console.Write(s.ToString());
+                            if (exact) Console.Write(search.DescribeRisk());
+                        }
+                        if (greedy || deepLethal || exact) { attackLethalTurns++; if (died) attackLethalDied++; continue; }
+                        int bin = (int)Math.Round(risk * 4);
+                        riskCount[bin]++;
+                        if (died) riskDied[bin]++;
+                        riskTurns++;
+                        riskSum += risk;
+                        if (died) riskActual++;
+                        if (risk > 0 && !died && riskDumped < DumpExamples)
+                        {
+                            riskDumped++;
+                            Console.WriteLine($"==== {Path.GetFileName(f)} turn {i}: predicted {risk:P0}, survived. Position after my move (opp deck known: {search.Opponent.DeckKnown}, unknown {search.Opponent.UnknownCount()}, unmatched {search.Opponent.Unmatched}); greedy {greedy} deep {deepLethal} exact {exact}:");
+                            Console.Write(s.ToString());
+                            Console.Write(search.DescribeRisk());
+                            var afterEnd = s.Clone(); afterEnd.EndTurn();
+                            Console.Write("   opp board after EndTurn:");
+                            for (int b = 0; b < afterEnd.Players[1].BoardCount; b++) Console.Write($" #{afterEnd.Players[1].Board[b].BaseId}/{afterEnd.Players[1].Board[b].InstanceId} can={afterEnd.Players[1].Board[b].CanAttack}");
+                            Console.WriteLine();
+                            Console.Write("   actual opp actions:");
+                            foreach (var oa in battle[i + 1].Input.OpponentActions) Console.Write(" " + oa.CardNumber + ":" + oa.Action + ";");
+                            Console.WriteLine();
+                            Console.WriteLine("   my hp after: " + next.Players[0].Health);
+                        }
+                    }
+                    if (s.Opp.BoardCount == 0) continue;
                     // реальные атаки существ, стоявших до хода противника
                     var actual = new Dictionary<int, int>();
                     foreach (var oa in battle[i + 1].Input.OpponentActions)
@@ -162,6 +210,16 @@ namespace Locm.Tests
                 }
             }
             Console.WriteLine($"{files.Count} files, {turns} replies: whole reply predicted {Pct(sameSet, turns)}, per-creature action match {Pct(targetMatch, creatures)} ({creatures} creatures)");
+            if (riskTurns > 0)
+            {
+                Console.WriteLine($"  attack-only lethal by any check on {attackLethalTurns} turns: actually died {Pct(attackLethalDied, attackLethalTurns)}; exact says lethal on {exactTurns}, died {Pct(exactDied, exactTurns)}");
+                for (int b = 0; b < 8; b++)
+                    if (lethalTable[b] > 0)
+                        Console.WriteLine($"    greedy {((b & 4) != 0 ? 1 : 0)} deep {((b & 2) != 0 ? 1 : 0)} exact {(b & 1)}: {lethalTable[b],6}");
+                Console.WriteLine($"  lethal risk calibration on {riskTurns} other turns: mean predicted {100 * riskSum / riskTurns:F1}%, actually died next turn {Pct(riskActual, riskTurns)}");
+                for (int b = 0; b < 5; b++)
+                    Console.WriteLine($"    predicted {b * 25,3}%: {riskCount[b],6} turns, died {Pct(riskDied[b], riskCount[b])}");
+            }
             return 0;
         }
 

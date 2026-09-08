@@ -179,8 +179,19 @@ namespace Locm.Tests
             TestUtil.Board(s, 1, TestUtil.Cr(4, 5, 5), canAttack: false);
             Assert.Equal(-Evaluator.WinScore, search.ReplyScore(s, 0));
 
+            // эвристика уровня 1 считает 10 - 1 >= 9 леталом; точная проверка (exactlethal=200) знает, что страж 1/1
+            // без Breakthrough у атакующего съедает весь удар 5/5 и в лицо доходит только 5 < 9
             TestUtil.Board(s, 0, TestUtil.Cr(1, 1, 1, "---G--"));
-            Assert.Equal(-Evaluator.WinScore, search.ReplyScore(s, 0), "10 - 1 >= 9 still lethal");
+            Assert.Equal(-Evaluator.WinScore, search.ReplyScore(s, 0), "heuristic: 10 - 1 >= 9");
+            search.ExactLethalNodes = 200;
+            Assert.True(search.ReplyScore(s, 0) > -Evaluator.WinScore, "exact: guard absorbs the whole hit without Breakthrough");
+
+            // с Breakthrough излишек проходит: 5 - 1 = 4 в лицо + 5 = 9 >= 9
+            var s3 = TestUtil.NewState(myHp: 9);
+            TestUtil.Board(s3, 1, TestUtil.Cr(3, 5, 5, "B-----"), canAttack: false);
+            TestUtil.Board(s3, 1, TestUtil.Cr(4, 5, 5), canAttack: false);
+            TestUtil.Board(s3, 0, TestUtil.Cr(1, 1, 1, "---G--"));
+            Assert.Equal(-Evaluator.WinScore, search.ReplyScore(s3, 0), "breakthrough carries excess through the guard");
 
             var s2 = TestUtil.NewState(myHp: 9);
             TestUtil.Board(s2, 1, TestUtil.Cr(3, 5, 5), canAttack: false);

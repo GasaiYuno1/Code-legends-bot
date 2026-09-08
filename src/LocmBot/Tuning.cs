@@ -74,6 +74,11 @@ namespace Locm
                     case "hands": search.SampledHands = (int)v; break;
                     case "samplednodes": search.SampledNodes = (int)v; break;
                     case "warmup": search.WarmUpMs = (int)v; break;
+                    case "exactlethal": search.ExactLethalNodes = (int)v; break;
+                    case "risk": search.LethalRiskCandidates = (int)v; break;
+                    case "riskw": search.LethalRiskW = v; break;
+                    case "riskhands": search.LethalRiskHands = (int)v; break;
+                    case "risknodes": search.LethalRiskNodes = (int)v; break;
                     case "net": search.UseNet = v != 0; break;
                     case "netscale": search.NetScale = v; break;
                     case "netadd": search.NetAdditive = v != 0; break;

@@ -110,8 +110,19 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--check", help="json с θ: только матч против эталона")
+    ap.add_argument("--vs", nargs=2, metavar=("ARGS_A", "ARGS_B"),
+                    help="только матч: аргументы key=value для A и для B (строки), --games партий, --bot сборка")
+    ap.add_argument("--bot", default=str(BOT), help="LocmBot.dll для --vs")
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
+
+    if args.vs:
+        a = f"dotnet {args.bot} warmup=0 {args.vs[0]}".strip()
+        b = f"dotnet {args.bot} warmup=0 {args.vs[1]}".strip()
+        t0 = time.time()
+        w, n = match(args.games, args.seed + 999, a, b, args.workers)
+        print(f"A {w}/{n} = {100.0 * w / n:.1f}% ({time.time() - t0:.0f} s)\n  A: {args.vs[0]}\n  B: {args.vs[1]}")
+        return
 
     if args.check:
         theta = json.load(open(args.check))
