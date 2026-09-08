@@ -16,7 +16,7 @@ namespace Locm
         public static bool UseWinAdjusted = false;
 
         /// <summary>Поправка из self-play (tools/arena/selfplay_cards.py): логит-вклад карты в победу колоды, сотые доли; пусто — нули.</summary>
-        private const string PackedSelf = "";
+        private const string PackedSelf = "-6,-13,-1,2,1,0,2,2,1,-18,3,-1,1,-6,1,1,3,2,2,-3,1,4,5,-16,0,1,-5,2,3,-2,-19,2,3,3,-1,2,4,-2,-4,-11,0,-10,-4,3,7,-1,0,2,3,2,4,2,3,2,-35,-4,-15,1,4,-3,7,7,-23,1,2,4,3,5,2,2,-3,4,-1,1,2,-5,3,-10,5,4,3,3,-2,2,0,3,0,3,-2,3,-2,-30,-4,-3,2,-1,0,-2,1,-3,-5,-9,2,1,2,2,-9,-12,2,-20,3,3,-21,4,6,5,-18,-5,-3,1,3,0,-8,-22,-3,2,1,4,4,-12,-6,-6,4,3,3,-10,1,-20,4,-17,0,-11,-32,1,2,-4,4,2,1,3,4,4,-32,-19,0,-22,2,3,-6,-38";
 
         public static double[] Rating => UseWinAdjusted ? _win : _pick;
         public static readonly double[] SelfPlay = PackedSelf.Length == 0 ? new double[Unpack(Packed).Length] : Unpack(PackedSelf);
