@@ -24,9 +24,11 @@ public double ChargeW = 0.2;
 public double Fragile1W = 0.0;
 public double Fragile2W = 0.0;
 public double BlueHandW = 0.0;
-public double HpW = 0.3;
+public double HpW = 0.1;
 public double LowHpW = 0.8;
 public int LowHp = 10;
+public double MidHpW = 0.0;
+public int MidHp = 20;
 public double HandCardW = 1.0;
 public double HandRatingW = 0.0;
 public double OppDrawW = 1.5;
@@ -49,6 +51,7 @@ public double Health(int hp)
 {
 if (hp <= 0) return -WinScore;
 double v = hp * HpW;
+if (hp < MidHp) v -= (MidHp - hp) * MidHpW;
 if (hp < LowHp) v -= (LowHp - hp) * LowHpW;
 return v;
 }
@@ -97,6 +100,120 @@ public void WarmUp(TurnClock clock) { }
 }
 }
 
+// ===== src/LocmBot/Battle/NetEval.cs =====
+namespace Locm
+{
+public static class NetFeatures
+{
+public const int PerSide = 22;
+public const int Count = PerSide * 2 + 5;
+public static void Extract(GameState s, int me, float[] f)
+{
+var p = s.Players[me];
+var o = s.Players[1 - me];
+int k = 0;
+int pAtk = Side(p, f, ref k);
+int oAtk = Side(o, f, ref k);
+f[k++] = (pAtk - o.Health) / 30f;
+f[k++] = (oAtk - p.Health) / 30f;
+f[k++] = (p.Health - o.Health) / 30f;
+f[k++] = (p.MaxMana - o.MaxMana) / 12f;
+f[k++] = s.Current == me ? 1f : 0f;
+}
+private static int Side(PlayerState p, float[] f, ref int k)
+{
+int sumA = 0, sumD = 0, maxA = 0, maxD = 0, guards = 0, guardDef = 0, wards = 0, lethal = 0, drain = 0, bt = 0, charge = 0, def1 = 0, minAD = 0;
+for (int i = 0; i < p.BoardCount; i++)
+{
+ref Creature c = ref p.Board[i];
+sumA += c.Attack;
+sumD += c.Defense;
+if (c.Attack > maxA) maxA = c.Attack;
+if (c.Defense > maxD) maxD = c.Defense;
+if (c.Has(Abilities.Guard)) { guards++; guardDef += c.Defense; }
+if (c.Has(Abilities.Ward)) wards++;
+if (c.Has(Abilities.Lethal)) lethal++;
+if (c.Has(Abilities.Drain)) drain += c.Attack;
+if (c.Has(Abilities.Breakthrough)) bt += c.Attack;
+if (c.Has(Abilities.Charge)) charge++;
+if (c.Defense <= 1) def1++;
+minAD += Math.Min(c.Attack, c.Defense);
+}
+f[k++] = p.Health / 30f;
+f[k++] = Math.Max(0, 10 - p.Health) / 10f;
+f[k++] = Math.Max(0, 20 - p.Health) / 20f;
+f[k++] = p.BoardCount / 6f;
+f[k++] = sumA / 20f;
+f[k++] = sumD / 20f;
+f[k++] = maxA / 12f;
+f[k++] = maxD / 12f;
+f[k++] = guards / 3f;
+f[k++] = guardDef / 15f;
+f[k++] = wards / 3f;
+f[k++] = lethal / 3f;
+f[k++] = drain / 10f;
+f[k++] = bt / 10f;
+f[k++] = charge / 3f;
+f[k++] = def1 / 3f;
+f[k++] = minAD / 15f;
+f[k++] = p.HandCount / 8f;
+f[k++] = Math.Max(0, p.NextTurnDraw - 1) / 3f;
+f[k++] = p.DeckSize / 30f;
+f[k++] = p.NextRune / 25f;
+f[k++] = p.MaxMana / 12f;
+return sumA;
+}
+}
+public sealed class NetEval
+{
+public static bool Available => NetWeights.Hidden > 0;
+private readonly int _h;
+private readonly float[] _w1;
+private readonly float[] _b1;
+private readonly float[] _w2;
+private readonly float _b2;
+private readonly float[] _f = new float[NetFeatures.Count];
+public NetEval()
+{
+_h = NetWeights.Hidden;
+var v = NetWeights.Packed.Length == 0 ? new string[0] : NetWeights.Packed.Split(',');
+int n = NetFeatures.Count;
+_w1 = new float[_h * n];
+_b1 = new float[_h];
+_w2 = new float[_h];
+int i = 0;
+for (int j = 0; j < _w1.Length && i < v.Length; j++) _w1[j] = int.Parse(v[i++]) / 10000f;
+for (int j = 0; j < _h && i < v.Length; j++) _b1[j] = int.Parse(v[i++]) / 10000f;
+for (int j = 0; j < _h && i < v.Length; j++) _w2[j] = int.Parse(v[i++]) / 10000f;
+_b2 = i < v.Length ? int.Parse(v[i]) / 10000f : 0f;
+}
+public double Logit(GameState s, int me)
+{
+NetFeatures.Extract(s, me, _f);
+int n = NetFeatures.Count;
+double outv = _b2;
+for (int j = 0; j < _h; j++)
+{
+double z = _b1[j];
+int off = j * n;
+for (int i = 0; i < n; i++) z += _w1[off + i] * _f[i];
+outv += _w2[j] * Math.Tanh(z);
+}
+return outv;
+}
+}
+}
+
+// ===== src/LocmBot/Battle/NetWeights.cs =====
+namespace Locm
+{
+public static class NetWeights
+{
+public const int Hidden = 32;
+public const string Packed = "-46,1705,1533,-1683,-1774,869,2882,-289,-429,-1176,-1588,1288,-1828,1810,959,-683,1939,-3601,-2013,-7289,-1031,-228,-380,-1495,-3705,318,2452,943,140,467,-311,-597,326,-1050,-968,645,-2086,1166,1200,-96,1700,6231,18,581,3713,959,-3876,253,1467,1462,4924,2668,-2604,-919,-581,-4045,-2167,-1144,-266,-3054,-3211,522,-799,1369,-2817,-1520,-4280,-1101,-3582,-329,-5231,1643,-6789,-3468,988,1051,-448,-5804,-1799,-1627,-1201,1860,1564,3687,-386,827,1367,761,4025,32,7341,1904,-3265,-2688,-2836,-3831,-17832,683,1438,-533,-1277,-933,-157,-849,-1863,-2166,721,-1193,394,2118,-389,-542,-2078,740,-1084,7789,1176,9139,1941,798,-524,1902,3355,-5532,-1318,-1205,780,-1700,-70,211,53,-1474,-1311,280,1771,1500,-1833,-2934,-2174,-6002,-1342,-2810,-2844,-1706,297,5944,2027,-1734,1473,1614,-347,-362,-43,-1730,831,737,1462,-713,-566,1933,208,1119,664,-942,-5006,165,-7395,359,1684,-1306,-2394,624,-698,126,2749,-1031,1220,-165,-360,1933,806,-919,591,-2804,545,1342,889,1850,6917,1212,-1376,1439,2087,533,1324,-86,1546,-1643,-3255,872,1206,2116,638,-1826,-1813,854,871,845,32,-393,-1117,3001,2487,1927,781,3900,-119,-488,-3280,889,1249,753,-1892,167,-1788,-1014,2485,-3305,1104,-2753,-1867,-2544,-764,-19,-487,-2048,-1760,-3986,-673,2235,-457,-85,-744,-1243,-556,1573,-2801,-366,1936,344,576,-676,-1486,1727,776,-1332,-961,875,1190,-838,77,189,7178,-2110,2637,-992,390,3667,1160,-147,-2293,-4243,561,-1018,-3745,-2653,845,881,-1355,274,1943,-3104,-2875,-491,-1339,-4708,-4681,1776,-1314,-1343,-3205,-162,2321,1702,-1558,-578,1052,433,1622,4682,4315,3035,-1765,2727,-1170,562,-1650,2052,1085,3024,3207,-13135,-1877,-6013,-3528,738,-1286,-2095,-1396,1866,1268,1228,594,435,1160,-1913,-1603,-211,225,-674,470,2895,119,2758,1679,4116,-2385,1764,296,811,-3163,-4056,-486,1209,441,-1134,-1715,-2494,-448,-1598,-402,-3532,863,-2488,-2090,-287,-380,-393,-807,-2508,-5202,2835,-692,-2008,-1249,3127,-823,-3180,-602,1033,-2203,459,-1575,-1709,-1296,-101,2023,-991,-423,-3321,502,1622,5954,-80,7407,550,-2034,-1348,-1764,-2370,-6949,3408,-1108,-5913,-7799,4348,2576,1979,-611,-2438,-885,3170,1892,306,-3919,-145,1579,-808,3920,-169,3357,4328,428,-5442,456,2797,5851,-3728,-6151,-4517,919,-1497,3848,1352,2799,180,428,1532,-290,-1610,-1005,8494,1767,-1961,-1581,-5985,2590,1566,-1550,-1232,-2597,-673,78,1996,-1196,-2109,-615,3577,-2960,-1434,1679,-449,1503,381,-389,3627,-2148,307,-6265,1965,-4954,-691,1254,-725,387,-4143,4427,4669,-413,-1985,1478,375,1651,635,3806,1458,428,2793,858,473,3121,561,3486,-92,968,1258,4135,2289,941,64,546,182,-251,-2438,-1002,-823,-669,463,419,2337,739,-1170,-886,1441,589,-1250,-3049,-1037,-2614,-1573,528,-2515,157,743,-2349,-1417,845,-56,-416,1515,-1543,-116,1163,372,-178,-1523,-2284,790,-851,7830,192,5847,-834,739,-917,-881,-1034,1156,919,-2,1222,1890,-4219,-4298,-1790,-115,-516,2950,816,-3882,1906,3692,-21,4022,-318,94,744,-3628,-4778,-3225,955,-140,-7053,-6145,229,1815,-1138,-4383,-4563,-460,941,1264,744,-3226,-1011,1241,232,-523,4073,-1646,-636,1849,-74,754,-1175,-1285,5558,-377,-967,419,192,408,-3664,-1518,394,-1354,3062,-1109,-652,-570,1331,1381,5053,2232,1609,-1219,51,-1488,-2447,356,-2357,-1030,-1488,626,3396,634,-116,1350,-2066,-3078,1357,-2605,-3325,454,1334,-1821,1055,3890,2939,4869,552,-2526,-450,1029,3809,4959,886,-1147,-1478,-2601,2313,3485,1378,167,1997,499,1329,-879,3550,155,913,1262,2251,110,4321,793,3912,-588,3751,-1095,908,3575,-1088,784,-795,2749,95,-1199,-129,-4130,-795,-490,656,1565,-3063,3583,-5850,986,-5894,-1843,3190,1240,1724,1340,5946,-1760,249,702,317,-5247,-1826,-4196,-1701,-2471,-1076,48,-2410,-3240,-2632,1796,-472,-1593,-1436,-5955,-3654,-2409,-371,-3176,783,-920,-1097,447,2279,-287,-2599,-1594,1214,1712,1398,1762,1572,922,-1353,700,1244,2758,-226,7724,2649,-2111,-2996,-4557,2204,-10915,112,1381,-1241,-1460,1673,1142,1874,1605,-1825,-916,-933,2010,-1731,-1361,-1593,-698,-216,2783,3754,-706,4513,888,-1188,1366,425,1729,-1833,-4396,1517,2545,-241,1232,-1602,-1962,-651,413,273,2041,1215,-2254,-3515,-3173,-3733,989,-3059,591,-1162,-70,-262,1087,-690,-237,454,-596,959,-482,-2377,-114,-7292,894,188,-483,-4520,163,844,-504,-1631,1,-736,4360,-681,577,1253,2256,1369,-3228,-3155,-3761,-874,518,2459,472,-2676,839,3195,2121,2917,660,-2025,79,-421,-1658,1721,-1892,224,2809,-4229,-3124,495,-1124,-3958,-5095,2585,-119,279,-4188,-344,-187,1561,2603,3786,-7546,-899,361,-3516,-2184,4378,4702,6519,1449,-5517,2618,9408,7855,-6327,-8461,-4791,-1947,-1354,1732,-1185,-5083,-4638,3987,-2960,-2268,-719,-4986,1466,659,892,2810,-5676,887,653,-5686,21780,876,-644,1109,-1963,-918,-1628,635,1113,663,159,1905,-4688,4009,-445,-435,1090,136,-2743,-286,-2803,-4430,722,-1360,24,-2889,-3561,-579,1000,855,-90,2250,2289,-384,-253,-614,664,-2015,-1886,-1772,-1678,3428,555,4704,1534,-296,-377,902,-1389,4755,2981,-49,1090,-886,-1125,-504,1403,261,-1457,800,57,-279,-3615,5085,-44,1763,299,-1307,-1684,1617,-1555,-4414,2437,892,-1305,520,1609,3571,560,1407,2465,-584,2168,-2513,1985,1003,2229,3522,-1234,1905,3066,1947,5434,-1510,-428,2686,1159,2270,53,-1415,184,-1400,564,269,1744,1054,-486,2605,2292,368,-466,-230,-2680,1065,-1662,-1798,256,1045,733,5259,-97,1633,-1306,-113,149,344,-352,416,-2336,290,9,-2618,1221,-3052,-1634,-2955,-3670,-1112,1030,-5122,323,-9969,-1028,-1024,1073,736,2547,-1242,597,-1140,716,1537,-1109,-2559,-617,-681,-1785,68,1478,-1036,441,800,101,866,1500,-10,-4773,2772,-6560,-5009,2416,-1899,435,3724,3895,4879,3781,740,1222,937,-1791,2767,-42,1205,-294,921,2212,153,4360,1829,1271,-314,1103,1419,616,-1140,-4988,2238,3976,2696,634,-5093,-2079,-2947,-251,-2303,-3113,-553,-2173,-5293,5160,-1022,-1341,-3337,-1762,-4379,189,-2990,239,-671,904,-604,-2539,2179,1786,2069,-1559,-1743,-128,-2533,1265,5136,6889,2489,6171,3650,1893,-2275,86,4362,1515,3347,-5165,-2968,-496,-9810,1460,1293,450,3493,254,-532,3496,-843,582,530,2338,-1020,-3346,444,-803,-1150,-1787,-988,-2149,-1946,6061,-1332,380,-633,-1220,-1682,1929,1278,1904,2234,-371,1272,-3350,194,773,1182,-442,1250,1488,-481,2655,402,-6008,-701,-579,-2436,1075,-3720,-7962,1076,-4939,-900,-2037,1805,-1849,1055,-2291,-3736,2111,-66,2188,-735,1004,-2457,-1100,-1997,624,-1343,5934,-11766,-6599,-2702,1296,-9723,-7146,6108,3525,-61,346,443,4399,-1081,4523,1262,-7994,222,-2474,5104,4,6373,2174,1579,-72,-19,-580,2071,-3384,-14364,2332,-2716,-121,-142,-2586,-2327,-2025,467,319,1965,-2431,1897,-688,-3529,-3259,-3834,2326,2151,-4899,2322,-5204,-631,-1841,784,-1062,41,282,3444,3110,-604,-10,1257,92,-561,-1986,-428,-316,-1164,-1859,1209,2123,244,6112,666,-148,-1440,1114,2666,2795,-350,-599,1611,2617,-3847,541,790,-1614,-1500,-1264,1434,1057,-2556,-2608,1728,-608,-3906,3289,-8675,16200,-1179,1708,-6459,2171,2068,4478,-1826,666,-3185,-2159,-2561,-19,-2759,-126,146,2569,-1965,-753,-1704,-3123,13761,5941,9208,2246,370,337,-3040,-2982,-10790,-1070,-590,-453,1015,2437,3920,1009,-174,337,-441,597,-220,1363,1886,2482,1522,870,2519,4576,527,2127,816,770,3,73,1466,711,-1934,-643,-1349,1005,-121,-1093,-963,-340,1135,975,3537,1082,-36,-5076,-560,-5009,-3983,-965,-1163,774,326,-2632,-932,-762,1369,7042,-134,-2927,-4507,-2001,-2169,3321,64,-2471,-2067,-3690,1989,-1947,-2679,-1208,19803,16497,6844,243,-3747,-1268,912,1104,1594,3729,2051,-2912,-921,-1080,5705,2741,5178,-3576,919,-425,-151,1427,-1150,3131,-2012,1705,-850,1966,2226,1739,-12040,3861,262,1129,-1203,-1815,-440,315,1872,-603,754,55,-910,2750,-1584,92,1759,441,876,-1137,-1107,-4018,-338,-1678,-700,1426,-2202,276,1704,-934,2865,3242,1840,-1478,0,-1308,-2233,-477,-3511,-1001,495,8194,-1342,6424,-155,-3061,-3969,654,1809,8446,1257,4107,1988,5136,-6866,-3915,-3225,2295,666,2882,706,-3558,-4020,-5189,1624,-2591,-1953,-2193,-3230,1389,1781,-2799,-7514,-2098,330,579,673,1834,3205,-442,-783,-204,997,334,2476,-2441,-613,630,-1323,424,5511,822,7786,2402,-2665,-1092,18,9570,-8095,-44,-1068,-1342,-2192,2114,1731,2579,-439,-861,-3040,1116,-759,-107,-1071,247,-2171,-561,2275,-990,-1096,4947,1995,-2126,1169,4120,2214,-1788,-329,431,2832,1469,999,-1118,-1871,-1030,-1731,-14,-4589,1145,10,-2160,1023,-4023,1659,915,-422,1278,3284,-4828,-511,621,1613,-260,749,-677,-251,682,1580,-1458,-275,1345,-256,665,-1672,1556,-140,-514,-950,1047,479,-1226,402,2230,-360,294,417,883,-422,-30,928,1681,-157,-6618,-6450,8223,-10026,2853,4890,-6423,-6305,7424,-9280,-6290,-3911,-4935,5656,-6166,6103,2521,8576,-4312,-3533,8004,-7917,-4470,6924,-6555,-9318,-11064,7902,8281,-7026,-8722,5384,-514";
+}
+}
+
 // ===== src/LocmBot/Battle/SearchBattle.cs =====
 namespace Locm
 {
@@ -116,11 +233,18 @@ public int Length;
 public double Static;
 }
 public readonly Evaluator Eval;
+public Evaluator OppEval;
+public bool UseNet = false;
+public double NetScale = 10.0;
+public bool NetAdditive = false;
+private readonly NetEval _net = new NetEval();
 public double ReplyWeight = 0.75;
 public int MaxCandidates = 1024;
 public double Phase1Share = 0.6;
 public int DeepReplyCandidates = 32;
 public int DeepReplyNodes = 400;
+public int CounterCandidates = 0;
+public int CounterNodes = 1500;
 private readonly GameState[] _pool = new GameState[MaxDepth + 2];
 private readonly List<GameAction>[] _legal = new List<GameAction>[MaxDepth + 1];
 private readonly Child[][] _children = new Child[MaxDepth + 1][];
@@ -132,11 +256,21 @@ private Candidate[] _heap;
 private int _heapCount;
 private readonly GameState _scratch = new GameState();
 private readonly GameState _tmp = new GameState();
+private readonly GameState _replyBest = new GameState();
+private readonly GameState[] _cPool = new GameState[MaxDepth + 2];
+private readonly List<GameAction>[] _cLegal = new List<GameAction>[MaxDepth + 1];
+private readonly HashSet<ulong> _cVisited = new HashSet<ulong>();
+private int _cNodes;
+private int _cRootBoard;
+private double _cBest;
 private readonly GameState[] _oppPool = new GameState[GameState.MaxBoard + 2];
 private readonly List<GameAction>[] _oppLegal = new List<GameAction>[GameState.MaxBoard + 2];
 private readonly HashSet<ulong> _oppVisited = new HashSet<ulong>();
 private readonly double[] _final = new double[4096];
 private int _oppNodes;
+private readonly GameAction[] _oppLine = new GameAction[GameState.MaxBoard + 2];
+private readonly GameAction[] _oppBestLine = new GameAction[GameState.MaxBoard + 2];
+private int _oppBestLen;
 private double _oppBest;
 private double _oppBestMine;
 private int _oppMe;
@@ -157,6 +291,7 @@ public long Nodes => _nodes;
 public int Candidates { get; private set; }
 public int Rescored { get; private set; }
 public int DeepRescored { get; private set; }
+public int CounterScored { get; private set; }
 private readonly int[] _order2 = new int[4096];
 public double BestScore => _best;
 public bool TimedOut { get; private set; }
@@ -164,6 +299,7 @@ public SearchBattle() : this(new Evaluator()) { }
 public SearchBattle(Evaluator eval)
 {
 Eval = eval;
+OppEval = eval;
 for (int i = 0; i < _pool.Length; i++) _pool[i] = new GameState();
 for (int i = 0; i < _legal.Length; i++)
 {
@@ -175,6 +311,8 @@ for (int i = 0; i < _oppPool.Length; i++)
 _oppPool[i] = new GameState();
 _oppLegal[i] = new List<GameAction>(64);
 }
+for (int i = 0; i < _cPool.Length; i++) _cPool[i] = new GameState();
+for (int i = 0; i < _cLegal.Length; i++) _cLegal[i] = new List<GameAction>(64);
 }
 public string PlayTurn(TurnInput input, TurnClock clock)
 {
@@ -209,6 +347,7 @@ _nodes = 0;
 _heapCount = 0;
 Rescored = 0;
 DeepRescored = 0;
+CounterScored = 0;
 _visited.Clear();
 if (!ReferenceEquals(root, _pool[0])) _pool[0].CopyFrom(root);
 int me = _pool[0].Current;
@@ -382,7 +521,8 @@ break;
 }
 Candidate c = _heap[i];
 double reply = ReplyScore(c.State, me);
-double final = ReplyWeight * reply + (1 - ReplyWeight) * c.Static;
+double stat = UseNet ? Leaf(c.State, me) : c.Static;
+double final = ReplyWeight * reply + (1 - ReplyWeight) * stat;
 if (i < _final.Length) _final[i] = final;
 scored = i + 1;
 Rescored++;
@@ -407,13 +547,16 @@ int t = order[i]; order[i] = order[best]; order[best] = t;
 }
 bestFinal = double.NegativeInfinity;
 bestIdx = -1;
+int deepDone = 0;
 for (int i = 0; i < m; i++)
 {
 if (_clock.TimeUp) { TimedOut = true; break; }
 Candidate c = _heap[order[i]];
 double deep = DeepReplyScore(c.State, me);
-double final = ReplyWeight * deep + (1 - ReplyWeight) * c.Static;
+double final = ReplyWeight * deep + (1 - ReplyWeight) * (UseNet ? Leaf(c.State, me) : c.Static);
+_final[order[i]] = final;
 DeepRescored++;
+deepDone = i + 1;
 if (final > bestFinal)
 {
 bestFinal = final;
@@ -421,6 +564,37 @@ bestIdx = order[i];
 }
 }
 if (bestIdx < 0) return;
+if (CounterCandidates > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver)
+{
+int k = Math.Min(deepDone, CounterCandidates);
+for (int i = 0; i < k; i++)
+{
+int best = i;
+for (int j = i + 1; j < deepDone; j++) if (_final[order[j]] > _final[order[best]]) best = j;
+int t = order[i]; order[i] = order[best]; order[best] = t;
+}
+double bestCounter = double.NegativeInfinity;
+int bestCounterIdx = -1;
+for (int i = 0; i < k; i++)
+{
+if (_clock.TimeUp) { TimedOut = true; break; }
+Candidate c = _heap[order[i]];
+DeepReplyScore(c.State, me);
+double counter = CounterScore(me);
+double final = ReplyWeight * counter + (1 - ReplyWeight) * (UseNet ? Leaf(c.State, me) : c.Static);
+CounterScored++;
+if (final > bestCounter)
+{
+bestCounter = final;
+bestCounterIdx = order[i];
+}
+}
+if (bestCounterIdx >= 0)
+{
+bestFinal = bestCounter;
+bestIdx = bestCounterIdx;
+}
+}
 }
 Candidate b = _heap[bestIdx];
 _best = bestFinal;
@@ -435,11 +609,11 @@ public int Compare(Candidate a, Candidate b) => b.Static.CompareTo(a.Static);
 }
 public double ReplyScore(GameState after, int me)
 {
-if (after.IsOver) return Eval.Score(after, me);
+if (after.IsOver) return Leaf(after, me);
 var s = _scratch;
 s.CopyFrom(after);
 s.EndTurn();
-if (s.IsOver) return Eval.Score(s, me);
+if (s.IsOver) return Leaf(s, me);
 int opp = s.Current;
 var o = s.Players[opp];
 var p = s.Players[me];
@@ -464,7 +638,7 @@ for (int i = 0; i < n && !s.IsOver; i++)
 int ai = o.FindCreature(_ids[i]);
 if (ai < 0 || !o.Board[ai].CanAttack) continue;
 int id = _ids[i];
-double bestSc = Eval.Score(s, opp);
+double bestSc = OppEval.Score(s, opp);
 int bestTarget = int.MinValue;
 bool guards = p.HasGuard();
 if (!guards)
@@ -481,24 +655,93 @@ if (sc > bestSc) { bestSc = sc; bestTarget = tid; }
 }
 if (bestTarget != int.MinValue) s.Apply(GameAction.Attack(id, bestTarget));
 }
-return Eval.Score(s, me);
+return Leaf(s, me);
 }
 public double DeepReplyScore(GameState after, int me)
 {
-if (after.IsOver) return Eval.Score(after, me);
+if (after.IsOver) return Leaf(after, me);
 var s = _oppPool[0];
 s.CopyFrom(after);
 s.EndTurn();
-if (s.IsOver) return Eval.Score(s, me);
+if (s.IsOver) return Leaf(s, me);
 int opp = s.Current;
 _oppVisited.Clear();
 _oppVisited.Add(s.Hash());
 _oppNodes = 0;
 _oppMe = me;
-_oppBest = Eval.Score(s, opp);
-_oppBestMine = Eval.Score(s, me);
+_oppBest = OppEval.Score(s, opp);
+_oppBestMine = Leaf(s, me);
+_replyBest.CopyFrom(s);
+_oppBestLen = 0;
 OppDfs(0, opp);
 return _oppBestMine;
+}
+public double Leaf(GameState s, int me)
+{
+if (s.IsOver || !UseNet || !NetEval.Available) return Eval.Score(s, me);
+double net = NetScale * _net.Logit(s, me);
+return NetAdditive ? Eval.Score(s, me) + net : net;
+}
+public void PredictReply(GameState after, int me, List<GameAction> into)
+{
+into.Clear();
+DeepReplyScore(after, me);
+for (int i = 0; i < _oppBestLen; i++) into.Add(_oppBestLine[i]);
+}
+public double CounterScore(int me)
+{
+var s = _cPool[0];
+s.CopyFrom(_replyBest);
+if (s.IsOver) return Eval.Score(s, me);
+s.EndTurn();
+if (s.IsOver) return Eval.Score(s, me);
+if (s.Current != me) return Eval.Score(s, me);
+_cVisited.Clear();
+_cVisited.Add(s.Hash());
+_cNodes = 0;
+_cRootBoard = s.Me.BoardCount;
+_cBest = Eval.Score(s, me);
+CounterDfs(0, ActionType.Pass, me);
+return _cBest;
+}
+private void CounterDfs(int depth, ActionType last, int me)
+{
+if (depth + 1 >= _cPool.Length) return;
+var s = _cPool[depth];
+var child = _cPool[depth + 1];
+var legal = _cLegal[depth];
+s.LegalActions(legal);
+for (int i = 0; i < legal.Count; i++)
+{
+GameAction a = legal[i];
+if (a.IsPass || !CounterAllowed(last, a.Type, s)) continue;
+if (_cNodes >= CounterNodes) return;
+child.CopyFrom(s);
+child.Apply(a);
+_cNodes++;
+if (!_cVisited.Add(child.Hash())) continue;
+double v = Eval.Score(child, me);
+if (v > _cBest) _cBest = v;
+if (child.IsOver)
+{
+if (child.Winner == me) { _cNodes = CounterNodes; return; }
+continue;
+}
+CounterDfs(depth + 1, a.Type, me);
+}
+}
+private bool CounterAllowed(ActionType last, ActionType next, GameState s)
+{
+switch (next)
+{
+case ActionType.Summon:
+if (last == ActionType.Pass || last == ActionType.Summon) return true;
+return s.Me.BoardCount < _cRootBoard;
+case ActionType.Use:
+return last != ActionType.Attack;
+default:
+return true;
+}
 }
 private void OppDfs(int depth, int opp)
 {
@@ -516,11 +759,15 @@ child.CopyFrom(s);
 child.Apply(a);
 _oppNodes++;
 if (!_oppVisited.Add(child.Hash())) continue;
-double v = Eval.Score(child, opp);
+_oppLine[depth] = a;
+double v = OppEval.Score(child, opp);
 if (v > _oppBest)
 {
 _oppBest = v;
-_oppBestMine = Eval.Score(child, _oppMe);
+_oppBestMine = Leaf(child, _oppMe);
+_replyBest.CopyFrom(child);
+_oppBestLen = depth + 1;
+Array.Copy(_oppLine, _oppBestLine, _oppBestLen);
 }
 if (child.IsOver) continue;
 OppDfs(depth + 1, opp);
@@ -530,7 +777,7 @@ private double TryAttack(GameState s, int id, int target, int opp)
 {
 _tmp.CopyFrom(s);
 _tmp.Apply(GameAction.Attack(id, target));
-return Eval.Score(_tmp, opp);
+return OppEval.Score(_tmp, opp);
 }
 private const string WarmUpPosition =
 "22 8 15 20 1\n" +
@@ -736,10 +983,14 @@ public static class CardTable
 public const int Games = 1474;
 public const int Picks = 71010;
 private const string Packed = "-39,-207,161,-111,57,47,308,96,161,-271,123,72,19,-161,90,-118,118,269,166,-223,118,-79,216,-259,-66,62,-106,201,264,-28,-280,258,227,16,-216,35,242,-55,-34,-158,27,-252,-168,268,-111,-183,-66,290,296,239,299,242,293,220,-366,-118,-290,-122,13,-242,41,-41,-252,210,313,237,276,320,293,100,-102,-27,27,-74,129,-152,0,-285,-7,272,111,219,16,244,197,-18,179,169,-71,-20,-59,-375,3,-64,173,150,70,-15,188,-61,-121,-228,224,66,129,118,-252,-199,166,-461,133,27,-340,136,160,288,-296,-60,-89,-74,150,-25,-183,-291,-152,-12,-119,91,97,-206,-243,-208,162,33,75,-181,-74,-350,277,-341,87,-215,-418,120,63,-143,192,177,-87,151,298,159,-524,-488,35,-405,76,183,-114,-475";
-public static readonly double[] Rating = Unpack();
-private static double[] Unpack()
+private const string PackedWin = "-63,-213,171,-128,56,11,319,89,162,-262,145,62,18,-148,78,-120,113,248,168,-217,113,-83,207,-256,-92,47,-81,177,275,-12,-295,272,220,-20,-213,54,240,-72,-30,-175,24,-249,-188,269,-94,-172,-50,290,289,224,304,223,316,247,-363,-128,-287,-114,37,-254,63,-13,-255,215,321,243,283,320,281,98,-126,-20,5,-76,133,-176,-42,-273,1,240,106,231,21,214,206,2,177,141,-93,-3,-74,-379,7,-68,211,146,74,-17,197,-73,-121,-228,221,68,126,153,-264,-229,183,-461,141,20,-337,127,177,290,-293,-19,-67,-89,173,-17,-178,-322,-194,-5,-136,119,109,-212,-234,-228,175,20,92,-162,-93,-357,304,-341,89,-226,-425,158,44,-166,197,131,-144,134,308,174,-524,-488,31,-402,44,184,-119,-475";
+public static bool UseWinAdjusted = false;
+public static double[] Rating => UseWinAdjusted ? _win : _pick;
+private static readonly double[] _pick = Unpack(Packed);
+private static readonly double[] _win = Unpack(PackedWin);
+private static double[] Unpack(string packed)
 {
-var parts = Packed.Split(',');
+var parts = packed.Split(',');
 var r = new double[parts.Length + 1];
 for (int i = 0; i < parts.Length; i++) r[i + 1] = int.Parse(parts[i]) / 100.0;
 return r;
@@ -2093,12 +2344,18 @@ public static class Tuning
 {
 public static void Apply(string[] args, SearchBattle search, TextWriter log)
 {
-var e = search.Eval;
 foreach (var arg in args)
 {
 int eq = arg.IndexOf('=');
 if (eq <= 0) continue;
 string key = arg.Substring(0, eq).ToLowerInvariant();
+var e = search.Eval;
+if (key.StartsWith("o_"))
+{
+if (ReferenceEquals(search.OppEval, search.Eval)) search.OppEval = Clone(search.Eval);
+e = search.OppEval;
+key = key.Substring(2);
+}
 if (key == "curve")
 {
 var parts = arg.Substring(eq + 1).Split(',');
@@ -2118,6 +2375,8 @@ switch (key)
 case "hp": e.HpW = v; break;
 case "lowhp": e.LowHpW = v; break;
 case "lowhpat": e.LowHp = (int)v; break;
+case "midhp": e.MidHpW = v; break;
+case "midhpat": e.MidHp = (int)v; break;
 case "atk": e.AttackW = v; break;
 case "def": e.DefenseW = v; break;
 case "guard": e.GuardW = v; break;
@@ -2126,6 +2385,8 @@ case "ward": e.WardW = v; break;
 case "wardatk": e.WardAtkW = v; break;
 case "lethal": e.LethalW = v; break;
 case "drain": e.DrainAtkW = v; break;
+case "breakthrough": e.BreakthroughAtkW = v; break;
+case "charge": e.ChargeW = v; break;
 case "hand": e.HandCardW = v; break;
 case "handrating": e.HandRatingW = v; break;
 case "fragile1": e.Fragile1W = v; break;
@@ -2137,8 +2398,14 @@ case "reply": search.ReplyWeight = v; break;
 case "cand": search.MaxCandidates = (int)v; break;
 case "deep": search.DeepReplyCandidates = (int)v; break;
 case "deepnodes": search.DeepReplyNodes = (int)v; break;
+case "counter": search.CounterCandidates = (int)v; break;
+case "net": search.UseNet = v != 0; break;
+case "netscale": search.NetScale = v; break;
+case "netadd": search.NetAdditive = v != 0; break;
+case "counternodes": search.CounterNodes = (int)v; break;
 case "table": CardRating.UseTable = v != 0; break;
 case "curvew": RatingDraft.CurveW = v; break;
+case "draftwin": CardTable.UseWinAdjusted = v != 0; break;
 case "maxitems": RatingDraft.MaxItems = (int)v; break;
 case "itempenalty": RatingDraft.ItemOverPenalty = v; break;
 case "samecard": RatingDraft.SameCardPenalty = v; break;
@@ -2146,8 +2413,18 @@ default:
 if (log != null) log.WriteLine("unknown override: " + arg);
 continue;
 }
-if (log != null) log.WriteLine("override " + key + "=" + v.ToString(CultureInfo.InvariantCulture));
+if (log != null) log.WriteLine("override " + (ReferenceEquals(e, search.Eval) ? "" : "o_") + key + "=" + v.ToString(CultureInfo.InvariantCulture));
 }
+}
+public static Evaluator Clone(Evaluator e)
+{
+return new Evaluator
+{
+AttackW = e.AttackW, DefenseW = e.DefenseW, GuardW = e.GuardW, GuardDefW = e.GuardDefW, WardW = e.WardW, WardAtkW = e.WardAtkW,
+LethalW = e.LethalW, DrainAtkW = e.DrainAtkW, BreakthroughAtkW = e.BreakthroughAtkW, ChargeW = e.ChargeW,
+Fragile1W = e.Fragile1W, Fragile2W = e.Fragile2W, BlueHandW = e.BlueHandW, HpW = e.HpW, LowHpW = e.LowHpW, LowHp = e.LowHp, MidHpW = e.MidHpW, MidHp = e.MidHp,
+HandCardW = e.HandCardW, HandRatingW = e.HandRatingW, OppDrawW = e.OppDrawW, MyDrawW = e.MyDrawW,
+};
 }
 }
 }
