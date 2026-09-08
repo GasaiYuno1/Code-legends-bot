@@ -7,6 +7,9 @@ namespace Locm
 
         /// <summary>Прогрев (JIT) в свободное время первого хода драфта; должен уложиться в часы.</summary>
         void WarmUp(TurnClock clock);
+
+        /// <summary>Ход драфта (тройка общая для обоих игроков) — данные для модели колоды противника.</summary>
+        void ObserveDraft(TurnInput input);
     }
 
     /// <summary>Заглушка этапа 0: ничего не делает.</summary>
@@ -14,5 +17,6 @@ namespace Locm
     {
         public string PlayTurn(TurnInput input, TurnClock clock) => "PASS";
         public void WarmUp(TurnClock clock) { }
+        public void ObserveDraft(TurnInput input) { }
     }
 }

@@ -40,6 +40,8 @@ namespace Locm
         public double NetScale = 10.0;
         /// <summary>true — сеть добавляется к линейной оценке (поправка), false — заменяет её.</summary>
         public bool NetAdditive = false;
+        /// <summary>true — сеть только на глубоком этапе (как обучалась: листья после полного ответа лучших по статике), без смеси со статикой.</summary>
+        public bool NetDeepOnly = true;
         private readonly NetEval _net = new NetEval();
         /// <summary>Доля оценки «после ответа противника» в итоговой (остальное — статика).</summary>
         public double ReplyWeight = 0.75;
@@ -51,6 +53,14 @@ namespace Locm
         public int DeepReplyCandidates = 32;
         /// <summary>Лимит узлов перебора атак противника на одного кандидата.</summary>
         public int DeepReplyNodes = 400;
+        /// <summary>Сколько лучших кандидатов после глубокого ответа переоценить полным ходом противника с сэмплированной рукой; 0 — выключено.</summary>
+        public int SampledCandidates = 0;
+        /// <summary>Число образцов руки противника (одинаковые для всех кандидатов хода).</summary>
+        public int SampledHands = 2;
+        /// <summary>Лимит узлов полного хода противника на один образец.</summary>
+        public int SampledNodes = 400;
+        /// <summary>Бюджет прогрева JIT на первом ходу драфта, мс (0 — без прогрева; для быстрых локальных матчей).</summary>
+        public int WarmUpMs = 400;
         /// <summary>Сколько лучших кандидатов после глубокого ответа оценить ещё и моим следующим ходом (3 полухода); 0 — выключено.</summary>
         public int CounterCandidates = 0;   // 8: совпадение с Legend 55.4% → 47.4%, self-play 16:14, до 94 мс — выключено (эффект горизонта: на листьях моего хода нет ответа противника)
         /// <summary>Лимит узлов перебора моего следующего хода на одного кандидата.</summary>
@@ -68,12 +78,25 @@ namespace Locm
         private readonly GameState _scratch = new GameState();
         private readonly GameState _tmp = new GameState();
         private readonly GameState _replyBest = new GameState();
+        private readonly GameState _sampledBest = new GameState();
+        private readonly Card[][] _hands = new Card[8][];
+        private readonly int[] _handLen = new int[8];
+        private ulong _rng;
+        /// <summary>Модель колоды/руки противника (тройки драфта + показанные карты).</summary>
+        public readonly OpponentModel Opponent = new OpponentModel();
+        private int _sampledPlayer;
+        private Evaluator _sampledEval;
         private readonly GameState[] _cPool = new GameState[MaxDepth + 2];
         private readonly List<GameAction>[] _cLegal = new List<GameAction>[MaxDepth + 1];
         private readonly HashSet<ulong> _cVisited = new HashSet<ulong>();
         private int _cNodes;
         private int _cRootBoard;
         private double _cBest;
+        private readonly GameAction[] _cLine = new GameAction[MaxDepth + 2];
+        private readonly GameAction[] _cBestLine = new GameAction[MaxDepth + 2];
+        private int _cBestLen;
+        private readonly GameAction[] _fullBestLine = new GameAction[MaxDepth + 2];
+        private int _fullBestLen;
         private readonly GameState[] _oppPool = new GameState[GameState.MaxBoard + 2];
         private readonly List<GameAction>[] _oppLegal = new List<GameAction>[GameState.MaxBoard + 2];
         private readonly HashSet<ulong> _oppVisited = new HashSet<ulong>();
@@ -105,6 +128,7 @@ namespace Locm
         public int Rescored { get; private set; }
         public int DeepRescored { get; private set; }
         public int CounterScored { get; private set; }
+        public int SampledScored { get; private set; }
         private readonly int[] _order2 = new int[4096];
         public double BestScore => _best;
         public bool TimedOut { get; private set; }
@@ -133,6 +157,7 @@ namespace Locm
         public string PlayTurn(TurnInput input, TurnClock clock)
         {
             _battleTurn++;
+            Opponent.ObserveBattle(input);
             if (!_sideKnown)
             {
                 _second = GameState.IsSecondPlayer(input);
@@ -142,10 +167,20 @@ namespace Locm
             return GameAction.Format(Search(_pool[0], clock));
         }
 
+        public void ObserveDraft(TurnInput input) => Opponent.ObserveDraft(input);
+
+        /// <summary>Новая партия (compare/self-play в одном процессе): сброс модели противника и счётчика ходов.</summary>
+        public void ResetGame()
+        {
+            Opponent.Reset();
+            _battleTurn = -1;
+            _sideKnown = false;
+        }
+
         /// <summary>Прогрев JIT: поиск на синтетической позиции; берём не больше 400 мс и оставляем запас на ответ.</summary>
         public void WarmUp(TurnClock clock)
         {
-            long budget = Math.Min(400, clock.RemainingMs - 400);
+            long budget = Math.Min(WarmUpMs, clock.RemainingMs - 400);
             if (budget < 20) return;
             var input = InputParser.ReadTurn(new System.IO.StringReader(WarmUpPosition));
             _pool[0].Load(input, 10);
@@ -168,6 +203,7 @@ namespace Locm
             Rescored = 0;
             DeepRescored = 0;
             CounterScored = 0;
+            SampledScored = 0;
             _visited.Clear();
             if (!ReferenceEquals(root, _pool[0])) _pool[0].CopyFrom(root);
             int me = _pool[0].Current;
@@ -401,8 +437,11 @@ namespace Locm
                 {
                     if (_clock.TimeUp) { TimedOut = true; break; }
                     Candidate c = _heap[order[i]];
+                    _deepPhase = true;
                     double deep = DeepReplyScore(c.State, me);
-                    double final = ReplyWeight * deep + (1 - ReplyWeight) * (UseNet ? Leaf(c.State, me) : c.Static);
+                    _deepPhase = false;
+                    bool netOnly = UseNet && NetEval.Available && NetDeepOnly;
+                    double final = netOnly ? deep : ReplyWeight * deep + (1 - ReplyWeight) * (UseNet ? Leaf(c.State, me) : c.Static);
                     _final[order[i]] = final;
                     DeepRescored++;
                     deepDone = i + 1;
@@ -413,6 +452,39 @@ namespace Locm
                     }
                 }
                 if (bestIdx < 0) return;
+
+                // уровень 3а: лучшие после глубокого ответа — полный ход противника с сэмплированной рукой (expectimax)
+                if (SampledCandidates > 0 && SampledHands > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver)
+                {
+                    int k = Math.Min(deepDone, SampledCandidates);
+                    for (int i = 0; i < k; i++)
+                    {
+                        int best = i;
+                        for (int j = i + 1; j < deepDone; j++) if (_final[order[j]] > _final[order[best]]) best = j;
+                        int t = order[i]; order[i] = order[best]; order[best] = t;
+                    }
+                    PrepareHands(_heap[order[0]].State, me);
+                    double bestS = double.NegativeInfinity;
+                    int bestSIdx = -1;
+                    for (int i = 0; i < k; i++)
+                    {
+                        if (_clock.TimeUp) { TimedOut = true; break; }
+                        Candidate c = _heap[order[i]];
+                        double sampled = SampledReplyScore(c.State, me);
+                        double final = ReplyWeight * sampled + (1 - ReplyWeight) * (UseNet ? Leaf(c.State, me) : c.Static);
+                        SampledScored++;
+                        if (final > bestS)
+                        {
+                            bestS = final;
+                            bestSIdx = order[i];
+                        }
+                    }
+                    if (bestSIdx >= 0)
+                    {
+                        bestFinal = bestS;
+                        bestIdx = bestSIdx;
+                    }
+                }
 
                 // уровень 3: лучшие после глубокого ответа — ещё и мой следующий ход (моя рука и мана известны)
                 if (CounterCandidates > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver)
@@ -545,10 +617,58 @@ namespace Locm
             return _oppBestMine;
         }
 
-        /// <summary>Оценка листа: терминал — ±WinScore, иначе сеть (если включена) или линейная оценка.</summary>
-        public double Leaf(GameState s, int me)
+        /// <summary>
+        /// Для обучения: кандидаты после моего хода (лучшие topK по статике из этапа 1), копии состояний.
+        /// </summary>
+        public List<GameState> CollectCandidates(GameState root, TurnClock clock, int topK)
         {
-            if (s.IsOver || !UseNet || !NetEval.Available) return Eval.Score(s, me);
+            _clock = clock;
+            _phase1Deadline = clock.ElapsedMs + clock.RemainingMs;
+            _stop = false;
+            _won = false;
+            TimedOut = false;
+            _nodes = 0;
+            _heapCount = 0;
+            EnsureHeap();
+            _visited.Clear();
+            _pool[0].CopyFrom(root);
+            int me = _pool[0].Current;
+            _rootBoard = _pool[0].Me.BoardCount;
+            _best = Eval.Score(_pool[0], me);
+            _bestLen = 0;
+            _visited.Add(_pool[0].Hash());
+            _line[0] = GameAction.Pass;
+            AddCandidate(_pool[0], _best, 0);
+            Dfs(0);
+            int n = _heapCount;
+            Array.Sort(_heap, 0, n, StaticDesc.Instance);
+            var result = new List<GameState>();
+            for (int i = 0; i < n && i < topK; i++)
+            {
+                if (_heap[i].State.IsOver) continue;
+                result.Add(_heap[i].State.Clone());
+            }
+            _heapCount = 0;
+            return result;
+        }
+
+        /// <summary>Для обучения: состояние после лучшего (для противника) ответа атаками на моё состояние after; null — партия окончена.</summary>
+        public GameState ReplyState(GameState after, int me)
+        {
+            if (after.IsOver) return null;
+            DeepReplyScore(after, me);
+            if (_replyBest.IsOver) return null;
+            return _replyBest.Clone();
+        }
+
+        /// <summary>Оценка листа: терминал — ±WinScore, иначе сеть (если включена) или линейная оценка.</summary>
+        public double Leaf(GameState s, int me) => Leaf(s, me, !NetDeepOnly);
+
+        private bool _deepPhase;
+
+        public double Leaf(GameState s, int me, bool allowNet)
+        {
+            if (s.IsOver || !UseNet || !NetEval.Available || !(allowNet || _deepPhase)) return Eval.Score(s, me);
             double net = NetScale * _net.Logit(s, me);
             return NetAdditive ? Eval.Score(s, me) + net : net;
         }
@@ -559,6 +679,133 @@ namespace Locm
             into.Clear();
             DeepReplyScore(after, me);
             for (int i = 0; i < _oppBestLen; i++) into.Add(_oppBestLine[i]);
+        }
+
+        /// <summary>Итоговая оценка позиции после моего хода по модели с сэмплированной рукой (для диагностики).</summary>
+        public double SampledFinal(GameState after, int me)
+        {
+            PrepareHands(after, me);
+            double st = UseNet ? Leaf(after, me) : Eval.Score(after, me);
+            return ReplyWeight * SampledReplyScore(after, me) + (1 - ReplyWeight) * st;
+        }
+
+        /// <summary>Предсказанный полный ход противника (призывы/предметы/атаки) по первому образцу его руки.</summary>
+        public void PredictFullReply(GameState after, int me, List<GameAction> into)
+        {
+            into.Clear();
+            if (after.IsOver) return;
+            PrepareHands(after, me);
+            SampledReplyScore(after, me);
+            for (int i = 0; i < _fullBestLen; i++) into.Add(_fullBestLine[i]);
+        }
+
+        // ---------------------------------------------------------------- полный ход противника с сэмплированной рукой
+
+        /// <summary>Образцы руки противника на этот ход: карты по силе из таблицы Legend-пиков; одни и те же для всех кандидатов.</summary>
+        private void PrepareHands(GameState anyCandidate, int me)
+        {
+            _rng = (ulong)anyCandidate.Players[1 - me].HandCount * 0x9E3779B97F4A7C15UL + 0x2545F4914F6CDD1DUL + (ulong)anyCandidate.Turn;
+            int n = Math.Min(8, anyCandidate.Players[1 - me].HandCount + 1);   // +1: карта, которую он доберёт
+            for (int k = 0; k < SampledHands && k < _hands.Length; k++)
+            {
+                if (_hands[k] == null || _hands[k].Length != n) _hands[k] = new Card[n];
+                int got = Opponent.Sample(ref _rng, _hands[k], n, 1000 + k * 16);
+                _handLen[k] = got;
+            }
+        }
+
+        /// <summary>
+        /// Среднее по образцам руки: противник получает сэмплированную руку, делает полный ход (призывы → предметы → атаки,
+        /// ограниченный перебор по OppEval), лист оценивается моей оценкой.
+        /// </summary>
+        public double SampledReplyScore(GameState after, int me)
+        {
+            if (after.IsOver) return Leaf(after, me);
+            double sum = 0;
+            int samples = 0;
+            for (int k = 0; k < SampledHands && k < _hands.Length && _hands[k] != null; k++)
+            {
+                var s = _cPool[0];
+                s.CopyFrom(after);
+                s.EndTurn();
+                if (s.IsOver) { sum += Leaf(s, me); samples++; continue; }
+                int opp = s.Current;
+                var o = s.Players[opp];
+                o.HandKnown = 0;
+                int give = Math.Min(o.HandCount, _handLen[k]);
+                for (int i = 0; i < give; i++) o.Hand[o.HandKnown++] = _hands[k][i];
+                _cVisited.Clear();
+                _cVisited.Add(s.Hash());
+                _cNodes = 0;
+                _cRootBoard = o.BoardCount;
+                _sampledPlayer = opp;
+                _sampledEval = OppEval;
+                _cBest = OppEval.Score(s, opp);
+                _cBestLen = 0;
+                _sampledBest.CopyFrom(s);
+                FullDfs(0, ActionType.Pass, opp, SampledNodes);
+                if (k == 0) { _fullBestLen = _cBestLen; Array.Copy(_cBestLine, _fullBestLine, _cBestLen); }
+                sum += Leaf(_sampledBest, me);
+                samples++;
+            }
+            return samples == 0 ? DeepReplyScore(after, me) : sum / samples;
+        }
+
+        /// <summary>
+        /// Ограниченный перебор полного хода игрока player (фазы как в основном поиске), лучший узел по _sampledEval → _sampledBest.
+        /// Дети по убыванию оценки — при лимите узлов это важнее ширины; массивы _children свободны после фазы 1.
+        /// </summary>
+        private void FullDfs(int depth, ActionType last, int player, int nodeCap)
+        {
+            if (depth + 1 >= _cPool.Length || depth >= _children.Length) return;
+            var s = _cPool[depth];
+            var child = _cPool[depth + 1];
+            var legal = _cLegal[depth];
+            s.LegalActions(legal);
+            var kids = _children[depth];
+            int n = 0;
+            for (int i = 0; i < legal.Count && n < kids.Length; i++)
+            {
+                GameAction a = legal[i];
+                if (a.IsPass || !CounterAllowed(last, a.Type, s)) continue;
+                if (_cNodes >= nodeCap) break;
+                child.CopyFrom(s);
+                child.Apply(a);
+                _cNodes++;
+                if (!_cVisited.Add(child.Hash())) continue;
+                double v = _sampledEval.Score(child, player);
+                if (v > _cBest)
+                {
+                    _cBest = v;
+                    _sampledBest.CopyFrom(child);
+                    _cLine[depth] = a;
+                    _cBestLen = depth + 1;
+                    Array.Copy(_cLine, _cBestLine, _cBestLen);
+                }
+                if (child.IsOver)
+                {
+                    if (child.Winner == player) { _cNodes = nodeCap; return; }
+                    continue;
+                }
+                kids[n].Action = a;
+                kids[n].Score = v;
+                n++;
+            }
+            for (int i = 1; i < n; i++)
+            {
+                Child k = kids[i];
+                int j = i - 1;
+                while (j >= 0 && kids[j].Score < k.Score) { kids[j + 1] = kids[j]; j--; }
+                kids[j + 1] = k;
+            }
+            for (int i = 0; i < n; i++)
+            {
+                if (_cNodes >= nodeCap) return;
+                child.CopyFrom(s);
+                child.Apply(kids[i].Action);
+                _cLine[depth] = kids[i].Action;
+                FullDfs(depth + 1, kids[i].Action.Type, player, nodeCap);
+            }
         }
 
         /// <summary>
@@ -616,7 +863,7 @@ namespace Locm
             {
                 case ActionType.Summon:
                     if (last == ActionType.Pass || last == ActionType.Summon) return true;
-                    return s.Me.BoardCount < _cRootBoard;
+                    return s.Players[s.Current].BoardCount < _cRootBoard;
                 case ActionType.Use:
                     return last != ActionType.Attack;
                 default:

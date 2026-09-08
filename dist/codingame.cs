@@ -92,11 +92,13 @@ public interface IBattleStrategy
 {
 string PlayTurn(TurnInput input, TurnClock clock);
 void WarmUp(TurnClock clock);
+void ObserveDraft(TurnInput input);
 }
 public sealed class PassBattle : IBattleStrategy
 {
 public string PlayTurn(TurnInput input, TurnClock clock) => "PASS";
 public void WarmUp(TurnClock clock) { }
+public void ObserveDraft(TurnInput input) { }
 }
 }
 
@@ -214,6 +216,158 @@ public const string Packed = "";
 }
 }
 
+// ===== src/LocmBot/Battle/OpponentModel.cs =====
+namespace Locm
+{
+public sealed class OpponentModel
+{
+public const int DeckSize = 30;
+public const double PickTemperature = 0.5;
+private readonly int[][] _triples = new int[DeckSize][];
+private readonly double[][] _cdf = new double[DeckSize][];
+private readonly List<int> _revealed = new List<int>(64);
+private readonly int[] _match = new int[DeckSize];
+private readonly bool[] _visited = new bool[DeckSize];
+private readonly int[] _unknown = new int[DeckSize];
+private bool _matchDirty = true;
+private double[] _poolCdf;
+public int Triples { get; private set; }
+public int Revealed => _revealed.Count;
+public int Unmatched { get { EnsureMatched(); return _unmatched; } }
+private int _unmatched;
+public bool DeckKnown => Triples >= DeckSize;
+public OpponentModel()
+{
+for (int i = 0; i < DeckSize; i++) { _triples[i] = new int[3]; _cdf[i] = new double[3]; }
+Reset();
+}
+public void Reset()
+{
+Triples = 0;
+_revealed.Clear();
+_unmatched = 0;
+_matchDirty = true;
+}
+public void ObserveDraft(TurnInput input)
+{
+if (Triples >= DeckSize || input.Cards.Count < 3) return;
+var t = _triples[Triples];
+var cdf = _cdf[Triples];
+double sum = 0;
+for (int j = 0; j < 3; j++)
+{
+t[j] = input.Cards[j].Number;
+double r = CardTable.Picks > 0 && CardDb.Contains(t[j]) ? CardTable.Rating[t[j]] : 0.0;
+sum += Math.Exp(r / PickTemperature);
+cdf[j] = sum;
+}
+for (int j = 0; j < 3; j++) cdf[j] /= sum;
+Triples++;
+_matchDirty = true;
+}
+public void ObserveBattle(TurnInput input)
+{
+for (int i = 0; i < input.OpponentActions.Count; i++)
+{
+var a = input.OpponentActions[i];
+if (a.Action.StartsWith("SUMMON") || a.Action.StartsWith("USE"))
+{
+_revealed.Add(a.CardNumber);
+_matchDirty = true;
+}
+}
+}
+public int Sample(ref ulong rng, Card[] hand, int n, int instanceBase)
+{
+if (!DeckKnown) return SampleFromPool(ref rng, hand, n, instanceBase);
+EnsureMatched();
+int u = 0;
+for (int i = 0; i < Triples; i++)
+{
+if (_match[i] >= 0) continue;
+double x = NextDouble(ref rng);
+var cdf = _cdf[i];
+int j = x < cdf[0] ? 0 : (x < cdf[1] ? 1 : 2);
+_unknown[u++] = _triples[i][j];
+}
+int take = Math.Min(n, u);
+for (int i = 0; i < take; i++)
+{
+int j = i + (int)(NextDouble(ref rng) * (u - i));
+if (j >= u) j = u - 1;
+int tmp = _unknown[i]; _unknown[i] = _unknown[j]; _unknown[j] = tmp;
+hand[i] = CardDb.Get(_unknown[i]).WithInstance(instanceBase + i, Location.MyHand);
+}
+return take;
+}
+public int UnknownCount()
+{
+if (!DeckKnown) return -1;
+EnsureMatched();
+int u = 0;
+for (int i = 0; i < Triples; i++) if (_match[i] < 0) u++;
+return u;
+}
+private void EnsureMatched()
+{
+if (!_matchDirty) return;
+_matchDirty = false;
+for (int i = 0; i < DeckSize; i++) _match[i] = -1;
+int matched = 0;
+for (int k = 0; k < _revealed.Count; k++)
+{
+Array.Clear(_visited, 0, _visited.Length);
+if (TryMatch(k)) matched++;
+}
+_unmatched = _revealed.Count - matched;
+}
+private bool TryMatch(int k)
+{
+int card = _revealed[k];
+for (int i = 0; i < Triples; i++)
+{
+if (_visited[i]) continue;
+var t = _triples[i];
+if (t[0] != card && t[1] != card && t[2] != card) continue;
+_visited[i] = true;
+if (_match[i] < 0 || TryMatch(_match[i]))
+{
+_match[i] = k;
+return true;
+}
+}
+return false;
+}
+private int SampleFromPool(ref ulong rng, Card[] hand, int n, int instanceBase)
+{
+if (_poolCdf == null)
+{
+_poolCdf = new double[CardDb.Count];
+double acc = 0;
+for (int i = 0; i < CardDb.Count; i++)
+{
+double r = CardTable.Picks > 0 ? CardTable.Rating[i + 1] : 0.0;
+acc += Math.Exp(r / 2.0);
+_poolCdf[i] = acc;
+}
+}
+for (int i = 0; i < n; i++)
+{
+double u = NextDouble(ref rng) * _poolCdf[CardDb.Count - 1];
+int lo = 0, hi = CardDb.Count - 1;
+while (lo < hi) { int mid = (lo + hi) >> 1; if (_poolCdf[mid] < u) lo = mid + 1; else hi = mid; }
+hand[i] = CardDb.Get(lo + 1).WithInstance(instanceBase + i, Location.MyHand);
+}
+return n;
+}
+private static double NextDouble(ref ulong rng)
+{
+rng ^= rng << 13; rng ^= rng >> 7; rng ^= rng << 17;
+return (rng >> 11) * (1.0 / 9007199254740992.0);
+}
+}
+}
+
 // ===== src/LocmBot/Battle/SearchBattle.cs =====
 namespace Locm
 {
@@ -237,12 +391,17 @@ public Evaluator OppEval;
 public bool UseNet = false;
 public double NetScale = 10.0;
 public bool NetAdditive = false;
+public bool NetDeepOnly = true;
 private readonly NetEval _net = new NetEval();
 public double ReplyWeight = 0.75;
 public int MaxCandidates = 1024;
 public double Phase1Share = 0.6;
 public int DeepReplyCandidates = 32;
 public int DeepReplyNodes = 400;
+public int SampledCandidates = 0;
+public int SampledHands = 2;
+public int SampledNodes = 400;
+public int WarmUpMs = 400;
 public int CounterCandidates = 0;
 public int CounterNodes = 1500;
 private readonly GameState[] _pool = new GameState[MaxDepth + 2];
@@ -257,12 +416,24 @@ private int _heapCount;
 private readonly GameState _scratch = new GameState();
 private readonly GameState _tmp = new GameState();
 private readonly GameState _replyBest = new GameState();
+private readonly GameState _sampledBest = new GameState();
+private readonly Card[][] _hands = new Card[8][];
+private readonly int[] _handLen = new int[8];
+private ulong _rng;
+public readonly OpponentModel Opponent = new OpponentModel();
+private int _sampledPlayer;
+private Evaluator _sampledEval;
 private readonly GameState[] _cPool = new GameState[MaxDepth + 2];
 private readonly List<GameAction>[] _cLegal = new List<GameAction>[MaxDepth + 1];
 private readonly HashSet<ulong> _cVisited = new HashSet<ulong>();
 private int _cNodes;
 private int _cRootBoard;
 private double _cBest;
+private readonly GameAction[] _cLine = new GameAction[MaxDepth + 2];
+private readonly GameAction[] _cBestLine = new GameAction[MaxDepth + 2];
+private int _cBestLen;
+private readonly GameAction[] _fullBestLine = new GameAction[MaxDepth + 2];
+private int _fullBestLen;
 private readonly GameState[] _oppPool = new GameState[GameState.MaxBoard + 2];
 private readonly List<GameAction>[] _oppLegal = new List<GameAction>[GameState.MaxBoard + 2];
 private readonly HashSet<ulong> _oppVisited = new HashSet<ulong>();
@@ -292,6 +463,7 @@ public int Candidates { get; private set; }
 public int Rescored { get; private set; }
 public int DeepRescored { get; private set; }
 public int CounterScored { get; private set; }
+public int SampledScored { get; private set; }
 private readonly int[] _order2 = new int[4096];
 public double BestScore => _best;
 public bool TimedOut { get; private set; }
@@ -317,6 +489,7 @@ for (int i = 0; i < _cLegal.Length; i++) _cLegal[i] = new List<GameAction>(64);
 public string PlayTurn(TurnInput input, TurnClock clock)
 {
 _battleTurn++;
+Opponent.ObserveBattle(input);
 if (!_sideKnown)
 {
 _second = GameState.IsSecondPlayer(input);
@@ -325,9 +498,16 @@ _sideKnown = true;
 _pool[0].Load(input, GameState.RefereeTurn(_battleTurn, _second));
 return GameAction.Format(Search(_pool[0], clock));
 }
+public void ObserveDraft(TurnInput input) => Opponent.ObserveDraft(input);
+public void ResetGame()
+{
+Opponent.Reset();
+_battleTurn = -1;
+_sideKnown = false;
+}
 public void WarmUp(TurnClock clock)
 {
-long budget = Math.Min(400, clock.RemainingMs - 400);
+long budget = Math.Min(WarmUpMs, clock.RemainingMs - 400);
 if (budget < 20) return;
 var input = InputParser.ReadTurn(new System.IO.StringReader(WarmUpPosition));
 _pool[0].Load(input, 10);
@@ -348,6 +528,7 @@ _heapCount = 0;
 Rescored = 0;
 DeepRescored = 0;
 CounterScored = 0;
+SampledScored = 0;
 _visited.Clear();
 if (!ReferenceEquals(root, _pool[0])) _pool[0].CopyFrom(root);
 int me = _pool[0].Current;
@@ -552,8 +733,11 @@ for (int i = 0; i < m; i++)
 {
 if (_clock.TimeUp) { TimedOut = true; break; }
 Candidate c = _heap[order[i]];
+_deepPhase = true;
 double deep = DeepReplyScore(c.State, me);
-double final = ReplyWeight * deep + (1 - ReplyWeight) * (UseNet ? Leaf(c.State, me) : c.Static);
+_deepPhase = false;
+bool netOnly = UseNet && NetEval.Available && NetDeepOnly;
+double final = netOnly ? deep : ReplyWeight * deep + (1 - ReplyWeight) * (UseNet ? Leaf(c.State, me) : c.Static);
 _final[order[i]] = final;
 DeepRescored++;
 deepDone = i + 1;
@@ -564,6 +748,37 @@ bestIdx = order[i];
 }
 }
 if (bestIdx < 0) return;
+if (SampledCandidates > 0 && SampledHands > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver)
+{
+int k = Math.Min(deepDone, SampledCandidates);
+for (int i = 0; i < k; i++)
+{
+int best = i;
+for (int j = i + 1; j < deepDone; j++) if (_final[order[j]] > _final[order[best]]) best = j;
+int t = order[i]; order[i] = order[best]; order[best] = t;
+}
+PrepareHands(_heap[order[0]].State, me);
+double bestS = double.NegativeInfinity;
+int bestSIdx = -1;
+for (int i = 0; i < k; i++)
+{
+if (_clock.TimeUp) { TimedOut = true; break; }
+Candidate c = _heap[order[i]];
+double sampled = SampledReplyScore(c.State, me);
+double final = ReplyWeight * sampled + (1 - ReplyWeight) * (UseNet ? Leaf(c.State, me) : c.Static);
+SampledScored++;
+if (final > bestS)
+{
+bestS = final;
+bestSIdx = order[i];
+}
+}
+if (bestSIdx >= 0)
+{
+bestFinal = bestS;
+bestIdx = bestSIdx;
+}
+}
 if (CounterCandidates > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver)
 {
 int k = Math.Min(deepDone, CounterCandidates);
@@ -676,9 +891,49 @@ _oppBestLen = 0;
 OppDfs(0, opp);
 return _oppBestMine;
 }
-public double Leaf(GameState s, int me)
+public List<GameState> CollectCandidates(GameState root, TurnClock clock, int topK)
 {
-if (s.IsOver || !UseNet || !NetEval.Available) return Eval.Score(s, me);
+_clock = clock;
+_phase1Deadline = clock.ElapsedMs + clock.RemainingMs;
+_stop = false;
+_won = false;
+TimedOut = false;
+_nodes = 0;
+_heapCount = 0;
+EnsureHeap();
+_visited.Clear();
+_pool[0].CopyFrom(root);
+int me = _pool[0].Current;
+_rootBoard = _pool[0].Me.BoardCount;
+_best = Eval.Score(_pool[0], me);
+_bestLen = 0;
+_visited.Add(_pool[0].Hash());
+_line[0] = GameAction.Pass;
+AddCandidate(_pool[0], _best, 0);
+Dfs(0);
+int n = _heapCount;
+Array.Sort(_heap, 0, n, StaticDesc.Instance);
+var result = new List<GameState>();
+for (int i = 0; i < n && i < topK; i++)
+{
+if (_heap[i].State.IsOver) continue;
+result.Add(_heap[i].State.Clone());
+}
+_heapCount = 0;
+return result;
+}
+public GameState ReplyState(GameState after, int me)
+{
+if (after.IsOver) return null;
+DeepReplyScore(after, me);
+if (_replyBest.IsOver) return null;
+return _replyBest.Clone();
+}
+public double Leaf(GameState s, int me) => Leaf(s, me, !NetDeepOnly);
+private bool _deepPhase;
+public double Leaf(GameState s, int me, bool allowNet)
+{
+if (s.IsOver || !UseNet || !NetEval.Available || !(allowNet || _deepPhase)) return Eval.Score(s, me);
 double net = NetScale * _net.Logit(s, me);
 return NetAdditive ? Eval.Score(s, me) + net : net;
 }
@@ -687,6 +942,115 @@ public void PredictReply(GameState after, int me, List<GameAction> into)
 into.Clear();
 DeepReplyScore(after, me);
 for (int i = 0; i < _oppBestLen; i++) into.Add(_oppBestLine[i]);
+}
+public double SampledFinal(GameState after, int me)
+{
+PrepareHands(after, me);
+double st = UseNet ? Leaf(after, me) : Eval.Score(after, me);
+return ReplyWeight * SampledReplyScore(after, me) + (1 - ReplyWeight) * st;
+}
+public void PredictFullReply(GameState after, int me, List<GameAction> into)
+{
+into.Clear();
+if (after.IsOver) return;
+PrepareHands(after, me);
+SampledReplyScore(after, me);
+for (int i = 0; i < _fullBestLen; i++) into.Add(_fullBestLine[i]);
+}
+private void PrepareHands(GameState anyCandidate, int me)
+{
+_rng = (ulong)anyCandidate.Players[1 - me].HandCount * 0x9E3779B97F4A7C15UL + 0x2545F4914F6CDD1DUL + (ulong)anyCandidate.Turn;
+int n = Math.Min(8, anyCandidate.Players[1 - me].HandCount + 1);
+for (int k = 0; k < SampledHands && k < _hands.Length; k++)
+{
+if (_hands[k] == null || _hands[k].Length != n) _hands[k] = new Card[n];
+int got = Opponent.Sample(ref _rng, _hands[k], n, 1000 + k * 16);
+_handLen[k] = got;
+}
+}
+public double SampledReplyScore(GameState after, int me)
+{
+if (after.IsOver) return Leaf(after, me);
+double sum = 0;
+int samples = 0;
+for (int k = 0; k < SampledHands && k < _hands.Length && _hands[k] != null; k++)
+{
+var s = _cPool[0];
+s.CopyFrom(after);
+s.EndTurn();
+if (s.IsOver) { sum += Leaf(s, me); samples++; continue; }
+int opp = s.Current;
+var o = s.Players[opp];
+o.HandKnown = 0;
+int give = Math.Min(o.HandCount, _handLen[k]);
+for (int i = 0; i < give; i++) o.Hand[o.HandKnown++] = _hands[k][i];
+_cVisited.Clear();
+_cVisited.Add(s.Hash());
+_cNodes = 0;
+_cRootBoard = o.BoardCount;
+_sampledPlayer = opp;
+_sampledEval = OppEval;
+_cBest = OppEval.Score(s, opp);
+_cBestLen = 0;
+_sampledBest.CopyFrom(s);
+FullDfs(0, ActionType.Pass, opp, SampledNodes);
+if (k == 0) { _fullBestLen = _cBestLen; Array.Copy(_cBestLine, _fullBestLine, _cBestLen); }
+sum += Leaf(_sampledBest, me);
+samples++;
+}
+return samples == 0 ? DeepReplyScore(after, me) : sum / samples;
+}
+private void FullDfs(int depth, ActionType last, int player, int nodeCap)
+{
+if (depth + 1 >= _cPool.Length || depth >= _children.Length) return;
+var s = _cPool[depth];
+var child = _cPool[depth + 1];
+var legal = _cLegal[depth];
+s.LegalActions(legal);
+var kids = _children[depth];
+int n = 0;
+for (int i = 0; i < legal.Count && n < kids.Length; i++)
+{
+GameAction a = legal[i];
+if (a.IsPass || !CounterAllowed(last, a.Type, s)) continue;
+if (_cNodes >= nodeCap) break;
+child.CopyFrom(s);
+child.Apply(a);
+_cNodes++;
+if (!_cVisited.Add(child.Hash())) continue;
+double v = _sampledEval.Score(child, player);
+if (v > _cBest)
+{
+_cBest = v;
+_sampledBest.CopyFrom(child);
+_cLine[depth] = a;
+_cBestLen = depth + 1;
+Array.Copy(_cLine, _cBestLine, _cBestLen);
+}
+if (child.IsOver)
+{
+if (child.Winner == player) { _cNodes = nodeCap; return; }
+continue;
+}
+kids[n].Action = a;
+kids[n].Score = v;
+n++;
+}
+for (int i = 1; i < n; i++)
+{
+Child k = kids[i];
+int j = i - 1;
+while (j >= 0 && kids[j].Score < k.Score) { kids[j + 1] = kids[j]; j--; }
+kids[j + 1] = k;
+}
+for (int i = 0; i < n; i++)
+{
+if (_cNodes >= nodeCap) return;
+child.CopyFrom(s);
+child.Apply(kids[i].Action);
+_cLine[depth] = kids[i].Action;
+FullDfs(depth + 1, kids[i].Action.Type, player, nodeCap);
+}
 }
 public double CounterScore(int me)
 {
@@ -736,7 +1100,7 @@ switch (next)
 {
 case ActionType.Summon:
 if (last == ActionType.Pass || last == ActionType.Summon) return true;
-return s.Me.BoardCount < _cRootBoard;
+return s.Players[s.Current].BoardCount < _cRootBoard;
 case ActionType.Use:
 return last != ActionType.Attack;
 default:
@@ -860,6 +1224,7 @@ if (_turn == 0)
 try { _battle.WarmUp(clock); }
 catch (Exception e) { _log.WriteLine("WarmUp error: " + e.Message); }
 }
+_battle.ObserveDraft(turn);
 int idx = _draft.Pick(turn, _picked);
 if (idx < 0 || idx > 2) idx = 0;
 _picked.Add(turn.Cards[idx]);
@@ -2399,9 +2764,14 @@ case "cand": search.MaxCandidates = (int)v; break;
 case "deep": search.DeepReplyCandidates = (int)v; break;
 case "deepnodes": search.DeepReplyNodes = (int)v; break;
 case "counter": search.CounterCandidates = (int)v; break;
+case "sampled": search.SampledCandidates = (int)v; break;
+case "hands": search.SampledHands = (int)v; break;
+case "samplednodes": search.SampledNodes = (int)v; break;
+case "warmup": search.WarmUpMs = (int)v; break;
 case "net": search.UseNet = v != 0; break;
 case "netscale": search.NetScale = v; break;
 case "netadd": search.NetAdditive = v != 0; break;
+case "netdeep": search.NetDeepOnly = v != 0; break;
 case "counternodes": search.CounterNodes = (int)v; break;
 case "table": CardRating.UseTable = v != 0; break;
 case "curvew": RatingDraft.CurveW = v; break;

@@ -79,6 +79,7 @@ namespace Locm
                     try { _battle.WarmUp(clock); }
                     catch (Exception e) { _log.WriteLine("WarmUp error: " + e.Message); }
                 }
+                _battle.ObserveDraft(turn);
                 int idx = _draft.Pick(turn, _picked);
                 if (idx < 0 || idx > 2) idx = 0;
                 _picked.Add(turn.Cards[idx]);
