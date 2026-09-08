@@ -79,6 +79,7 @@ namespace Locm.Tests
                     if (diff > 0.5) mineBetter++;
                     else if (diff < -0.5) theirsBetter++;
                     bool lethalCase = afterMine.Winner == 0 && afterTheirs.Winner != 0;
+                    if (!SameActions(theirs, mine) && !afterMine.IsOver && !afterTheirs.IsOver) StyleDiff.Add(s, afterTheirs, afterMine, theirs, mine);
                     if (dumped < DumpExamples && (DumpLethalOnly ? lethalCase : diff > 0.5))
                     {
                         dumped++;
@@ -97,6 +98,7 @@ namespace Locm.Tests
             Console.WriteLine($"  lethal found: theirs {theirsWin}, mine {mineWin}");
             Console.WriteLine($"  mean(my - their) on non-lethal turns: {sumDiff / Math.Max(1, turns):F2}");
             Console.WriteLine($"  time: avg {(double)sumMs / Math.Max(1, turns):F1} ms, max {maxMs} ms, timed out {timedOut}; sampled rescored {sampledTotal}, risk checked {riskTotal}");
+            StyleDiff.Print();
             Console.WriteLine($"  opponent model: deck known on {modelTurns} turns, unknown-count mismatch {modelMismatch}");
             return 0;
         }
@@ -307,5 +309,56 @@ namespace Locm.Tests
         }
 
         private static string Pct(int a, int b) => b == 0 ? "-" : (100.0 * a / b).ToString("F1") + "%";
+    }
+}
+
+namespace Locm.Tests
+{
+    /// <summary>Чем ходы из лога систематически отличаются от моих: средние признаки состояния после их хода минус после моего.</summary>
+    public static class StyleDiff
+    {
+        private static readonly string[] Names = { "opp hp dealt", "my hp lost", "opp creatures killed", "my creatures lost", "my board size", "opp board size", "cards played", "items used", "mana left", "my board value", "opp board value", "face attacks", "creature attacks", "hand size" };
+        private static readonly double[] Sum = new double[Names.Length];
+        private static int _n;
+
+        public static void Add(GameState before, GameState theirs, GameState mine, IList<GameAction> theirLine, IList<GameAction> myLine)
+        {
+            var eval = new Evaluator();
+            double[] t = Features(before, theirs, theirLine, eval), m = Features(before, mine, myLine, eval);
+            for (int i = 0; i < Names.Length; i++) Sum[i] += t[i] - m[i];
+            _n++;
+        }
+
+        private static double[] Features(GameState before, GameState after, IList<GameAction> line, Evaluator eval)
+        {
+            var f = new double[Names.Length];
+            f[0] = before.Players[1].Health - after.Players[1].Health;
+            f[1] = before.Players[0].Health - after.Players[0].Health;
+            f[2] = before.Players[1].BoardCount - after.Players[1].BoardCount;
+            f[3] = 0;
+            for (int i = 0; i < before.Players[0].BoardCount; i++) if (after.Players[0].FindCreature(before.Players[0].Board[i].InstanceId) < 0) f[3]++;
+            f[4] = after.Players[0].BoardCount;
+            f[5] = after.Players[1].BoardCount;
+            int played = 0, items = 0, face = 0, catt = 0;
+            foreach (var a in line)
+            {
+                if (a.Type == ActionType.Summon) played++;
+                else if (a.Type == ActionType.Use) { played++; items++; }
+                else if (a.Type == ActionType.Attack) { if (a.Target < 0) face++; else catt++; }
+            }
+            f[6] = played; f[7] = items; f[8] = after.Players[0].Mana;
+            double bv = 0, ov = 0;
+            for (int i = 0; i < after.Players[0].BoardCount; i++) bv += eval.Creature(in after.Players[0].Board[i]);
+            for (int i = 0; i < after.Players[1].BoardCount; i++) ov += eval.Creature(in after.Players[1].Board[i]);
+            f[9] = bv; f[10] = ov; f[11] = face; f[12] = catt; f[13] = after.Players[0].HandCount;
+            return f;
+        }
+
+        public static void Print()
+        {
+            if (_n == 0) return;
+            Console.WriteLine($"  style diff on {_n} differing turns (their move minus mine, mean):");
+            for (int i = 0; i < Names.Length; i++) Console.WriteLine($"    {Names[i],-22} {Sum[i] / _n:+0.00;-0.00}");
+        }
     }
 }

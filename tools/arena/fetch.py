@@ -147,6 +147,7 @@ def main():
     ap.add_argument("--out", default="data/arena/games.txt")
     ap.add_argument("--delay", type=float, default=0.15)
     ap.add_argument("--handle", default=None, help="публичный handle игрока (из URL профиля): скачать его последние бои вместо топа лиги")
+    ap.add_argument("--pseudo", default=None, help="ник игрока в таблице лидеров (альтернатива --handle)")
     args = ap.parse_args()
 
     out = Path(args.out)
@@ -155,10 +156,10 @@ def main():
 
     users = leaderboard()
     leagues = {u["agentId"]: u["league"]["divisionIndex"] for u in users}
-    if args.handle:
-        picked = [u for u in users if (u.get("codingamer") or {}).get("publicHandle") == args.handle]
+    if args.handle or args.pseudo:
+        picked = [u for u in users if (u.get("codingamer") or {}).get("publicHandle") == args.handle or (args.pseudo and u.get("pseudo") == args.pseudo)]
         if not picked:
-            print("handle not found in the top-1000 leaderboard", file=sys.stderr)
+            print("handle/pseudo not found in the top-1000 leaderboard", file=sys.stderr)
             return
         u = picked[0]
         print(f"{u['pseudo']}: rank {u['rank']}, league {u['league']['divisionIndex']} #{u['localRank']}, agent {u['agentId']}", file=sys.stderr)
