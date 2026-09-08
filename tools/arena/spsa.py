@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-BOT = ROOT / "build" / "bot-ref2" / "LocmBot.dll"
+BOT = ROOT / "build" / "bot-spsa" / "LocmBot.dll"   # эталон = текущая версия арены (SPSA-веса + selfw=20)
 CLASSES = ROOT / "build" / "refcheck-classes"
 RESOURCES = Path("/home/user/codingame/legendsofcodeandmagic/src/main/resources")
 OUT = ROOT / "build" / "spsa"
@@ -30,27 +30,31 @@ WINS_RE = re.compile(r"A: wins (\d+)/(\d+)")
 
 # ключ Tuning: (дефолт, масштаб возмущения c, минимум, максимум)
 PARAMS = {
-    "atk": (1.0, 0.15, 0.2, 3.0),
-    "def": (0.8, 0.15, 0.1, 3.0),
-    "guard": (0.8, 0.2, 0.0, 3.0),
-    "guarddef": (0.25, 0.1, 0.0, 1.5),
-    "ward": (1.2, 0.3, 0.0, 4.0),
-    "wardatk": (0.3, 0.1, 0.0, 1.5),
-    "lethal": (1.5, 0.4, 0.0, 5.0),
-    "drain": (0.3, 0.1, 0.0, 1.5),
-    "breakthrough": (0.15, 0.06, 0.0, 1.0),
-    "charge": (0.2, 0.1, 0.0, 1.5),
-    "hp": (0.1, 0.04, 0.0, 0.8),
-    "lowhp": (0.8, 0.2, 0.0, 3.0),
-    "midhp": (0.0, 0.05, 0.0, 0.6),
-    "hand": (1.0, 0.2, 0.0, 3.0),
-    "handrating": (0.0, 0.15, 0.0, 1.5),
-    "fragile1": (0.0, 0.15, 0.0, 1.5),
+    "atk": (0.9567, 0.15, 0.2, 3.0),
+    "def": (0.6572, 0.15, 0.1, 3.0),
+    "guard": (0.7925, 0.2, 0.0, 3.0),
+    "guarddef": (0.007, 0.1, 0.0, 1.5),
+    "ward": (1.1138, 0.3, 0.0, 4.0),
+    "wardatk": (0.4796, 0.1, 0.0, 1.5),
+    "lethal": (2.0783, 0.4, 0.0, 5.0),
+    "drain": (0.2222, 0.1, 0.0, 1.5),
+    "breakthrough": (0.0553, 0.06, 0.0, 1.0),
+    "charge": (0.1949, 0.1, 0.0, 1.5),
+    "hp": (0.1024, 0.04, 0.0, 0.8),
+    "lowhp": (0.9682, 0.2, 0.0, 3.0),
+    "midhp": (0.0467, 0.05, 0.0, 0.6),
+    "hand": (1.3635, 0.2, 0.0, 3.0),
+    "handrating": (0.0936, 0.15, 0.0, 1.5),
+    "fragile1": (0.0127, 0.15, 0.0, 1.5),
     "fragile2": (0.0, 0.1, 0.0, 1.0),
-    "blue": (0.0, 0.2, 0.0, 2.0),
-    "oppdraw": (1.5, 0.3, 0.0, 4.0),
-    "mydraw": (1.2, 0.3, 0.0, 4.0),
-    "reply": (0.75, 0.08, 0.3, 0.95),
+    "blue": (0.1463, 0.2, 0.0, 2.0),
+    "oppdraw": (1.4892, 0.3, 0.0, 4.0),
+    "mydraw": (1.5101, 0.3, 0.0, 4.0),
+    "reply": (0.9, 0.08, 0.3, 0.95),
+    # драфт
+    "curvew": (0.1, 0.1, 0.0, 1.0),
+    "selfw": (20.0, 8.0, 0.0, 80.0),
+    "itempenalty": (3.0, 1.0, 0.0, 8.0),
 }
 
 
@@ -98,7 +102,7 @@ def log(msg):
 
 
 def main():
-    global CLASSES
+    global CLASSES, OUT
     ap = argparse.ArgumentParser()
     ap.add_argument("--iters", type=int, default=100)
     ap.add_argument("--games", type=int, default=1000, help="партий на итерацию (θ+ против θ−)")
@@ -116,8 +120,10 @@ def main():
     ap.add_argument("--bot", default=str(BOT), help="LocmBot.dll для --vs (сторона A)")
     ap.add_argument("--bot-b", default=None, help="LocmBot.dll для стороны B в --vs (по умолчанию тот же, что --bot)")
     ap.add_argument("--classes", default=str(CLASSES), help="каталог классов BotMatch")
+    ap.add_argument("--out", default=str(OUT), help="каталог журнала/состояния")
     args = ap.parse_args()
     CLASSES = Path(args.classes)
+    OUT = Path(args.out)
     OUT.mkdir(parents=True, exist_ok=True)
 
     if args.vs:
