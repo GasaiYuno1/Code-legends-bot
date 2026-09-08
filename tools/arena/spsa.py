@@ -98,6 +98,7 @@ def log(msg):
 
 
 def main():
+    global CLASSES
     ap = argparse.ArgumentParser()
     ap.add_argument("--iters", type=int, default=100)
     ap.add_argument("--games", type=int, default=1000, help="партий на итерацию (θ+ против θ−)")
@@ -113,7 +114,9 @@ def main():
     ap.add_argument("--vs", nargs=2, metavar=("ARGS_A", "ARGS_B"),
                     help="только матч: аргументы key=value для A и для B (строки), --games партий, --bot сборка")
     ap.add_argument("--bot", default=str(BOT), help="LocmBot.dll для --vs")
+    ap.add_argument("--classes", default=str(CLASSES), help="каталог классов BotMatch")
     args = ap.parse_args()
+    CLASSES = Path(args.classes)
     OUT.mkdir(parents=True, exist_ok=True)
 
     if args.vs:
