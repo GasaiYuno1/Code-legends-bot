@@ -10,6 +10,9 @@ namespace Locm
 
         /// <summary>Ход драфта (тройка общая для обоих игроков) — данные для модели колоды противника.</summary>
         void ObserveDraft(TurnInput input);
+
+        /// <summary>Статистика последнего хода для stderr (узлы, скорость) — чтобы по консоли арены видеть, успевает ли поиск.</summary>
+        string LastStats { get; }
     }
 
     /// <summary>Заглушка этапа 0: ничего не делает.</summary>
@@ -17,6 +20,7 @@ namespace Locm
     {
         public string PlayTurn(TurnInput input, TurnClock clock) => "PASS";
         public void WarmUp(TurnClock clock) { }
+        public string LastStats => "";
         public void ObserveDraft(TurnInput input) { }
     }
 }

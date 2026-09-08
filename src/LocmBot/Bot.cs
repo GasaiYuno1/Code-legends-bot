@@ -63,7 +63,7 @@ namespace Locm
                     _dump.WriteLine("> " + answer);
                     _dump.Flush();
                 }
-                _log.WriteLine($"turn {_turn} done in {clock.ElapsedMs} ms: {answer}");
+                _log.WriteLine($"turn {_turn} done in {clock.ElapsedMs} ms: {answer}" + (_turn >= DraftTurns ? " | " + _battle.LastStats : ""));
                 _turn++;
             }
         }

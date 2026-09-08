@@ -93,11 +93,13 @@ public interface IBattleStrategy
 string PlayTurn(TurnInput input, TurnClock clock);
 void WarmUp(TurnClock clock);
 void ObserveDraft(TurnInput input);
+string LastStats { get; }
 }
 public sealed class PassBattle : IBattleStrategy
 {
 public string PlayTurn(TurnInput input, TurnClock clock) => "PASS";
 public void WarmUp(TurnClock clock) { }
+public string LastStats => "";
 public void ObserveDraft(TurnInput input) { }
 }
 }
@@ -494,6 +496,8 @@ _oppLegal[i] = new List<GameAction>(64);
 for (int i = 0; i < _cPool.Length; i++) _cPool[i] = new GameState();
 for (int i = 0; i < _cLegal.Length; i++) _cLegal[i] = new List<GameAction>(64);
 }
+private long _lastMs;
+public string LastStats => $"nodes {_nodes} ({(_lastMs > 0 ? _nodes / _lastMs : _nodes)}/ms), candidates {Candidates}, rescored {Rescored}/{DeepRescored}{(TimedOut ? ", TIMEOUT" : "")}";
 public string PlayTurn(TurnInput input, TurnClock clock)
 {
 _battleTurn++;
@@ -504,7 +508,9 @@ _second = GameState.IsSecondPlayer(input);
 _sideKnown = true;
 }
 _pool[0].Load(input, GameState.RefereeTurn(_battleTurn, _second));
-return GameAction.Format(Search(_pool[0], clock));
+var line = Search(_pool[0], clock);
+_lastMs = clock.ElapsedMs;
+return GameAction.Format(line);
 }
 public void ObserveDraft(TurnInput input) => Opponent.ObserveDraft(input);
 public void ResetGame()
@@ -1397,7 +1403,7 @@ _dump.Write(recorder.Take());
 _dump.WriteLine("> " + answer);
 _dump.Flush();
 }
-_log.WriteLine($"turn {_turn} done in {clock.ElapsedMs} ms: {answer}");
+_log.WriteLine($"turn {_turn} done in {clock.ElapsedMs} ms: {answer}" + (_turn >= DraftTurns ? " | " + _battle.LastStats : ""));
 _turn++;
 }
 }

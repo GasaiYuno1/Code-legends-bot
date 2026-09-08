@@ -167,6 +167,9 @@ namespace Locm
             for (int i = 0; i < _cLegal.Length; i++) _cLegal[i] = new List<GameAction>(64);
         }
 
+        private long _lastMs;
+        public string LastStats => $"nodes {_nodes} ({(_lastMs > 0 ? _nodes / _lastMs : _nodes)}/ms), candidates {Candidates}, rescored {Rescored}/{DeepRescored}{(TimedOut ? ", TIMEOUT" : "")}";
+
         public string PlayTurn(TurnInput input, TurnClock clock)
         {
             _battleTurn++;
@@ -177,7 +180,9 @@ namespace Locm
                 _sideKnown = true;
             }
             _pool[0].Load(input, GameState.RefereeTurn(_battleTurn, _second));
-            return GameAction.Format(Search(_pool[0], clock));
+            var line = Search(_pool[0], clock);
+            _lastMs = clock.ElapsedMs;
+            return GameAction.Format(line);
         }
 
         public void ObserveDraft(TurnInput input) => Opponent.ObserveDraft(input);
