@@ -71,6 +71,7 @@ namespace Locm
                     case "counternodes": search.CounterNodes = (int)v; break;
                     case "table": CardRating.UseTable = v != 0; break;
                     case "curvew": RatingDraft.CurveW = v; break;
+                    case "draftwin": CardTable.UseWinAdjusted = v != 0; break;
                     case "maxitems": RatingDraft.MaxItems = (int)v; break;
                     case "itempenalty": RatingDraft.ItemOverPenalty = v; break;
                     case "samecard": RatingDraft.SameCardPenalty = v; break;
