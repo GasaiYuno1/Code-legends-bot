@@ -81,6 +81,63 @@ namespace Locm.Tests
             return 0;
         }
 
+        /// <summary>
+        /// Точность модели ответа: после моего фактического хода предсказываем атаки противника (DeepReply по OppEval)
+        /// и сравниваем с его реальными атаками из следующего ввода (только существа, стоявшие у него до его хода).
+        /// </summary>
+        public static int ReplyCheck(string[] paths, string[] overrides, int limit, int step)
+        {
+            var search = new SearchBattle();
+            Tuning.Apply(overrides, search, Console.Out);
+            var files = new List<string>();
+            foreach (var p in paths)
+            {
+                if (Directory.Exists(p)) files.AddRange(Directory.GetFiles(p, "*.log"));
+                else files.Add(p);
+            }
+            files.Sort(StringComparer.Ordinal);
+            var predicted = new List<GameAction>();
+            int turns = 0, sameSet = 0, creatures = 0, targetMatch = 0, seen = 0;
+            foreach (var f in files)
+            {
+                if (turns >= limit) break;
+                var battle = new List<Replay.LoggedTurn>();
+                foreach (var t in Replay.Parse(File.ReadAllText(f))) if (!t.Input.LooksLikeDraft) battle.Add(t);
+                for (int i = 0; i + 1 < battle.Count && turns < limit; i++)
+                {
+                    var s = GameState.FromInput(battle[i].Input);
+                    if (s.IsOver) continue;
+                    if (seen++ % step != 0) continue;
+                    s.ApplySequence(GameAction.ParseSequence(battle[i].Answer));
+                    if (s.IsOver || s.Opp.BoardCount == 0) continue;
+                    // реальные атаки существ, стоявших до хода противника
+                    var actual = new Dictionary<int, int>();
+                    foreach (var oa in battle[i + 1].Input.OpponentActions)
+                    {
+                        GameAction a;
+                        if (!GameAction.TryParse(oa.Action, out a) || a.Type != ActionType.Attack) continue;
+                        if (s.Opp.FindCreature(a.Id) >= 0 && !actual.ContainsKey(a.Id)) actual[a.Id] = a.Target;
+                    }
+                    search.PredictReply(s, 0, predicted);
+                    var pred = new Dictionary<int, int>();
+                    foreach (var a in predicted) if (!pred.ContainsKey(a.Id)) pred[a.Id] = a.Target;
+                    turns++;
+                    bool same = pred.Count == actual.Count;
+                    for (int k = 0; k < s.Opp.BoardCount; k++)
+                    {
+                        int id = s.Opp.Board[k].InstanceId;
+                        int pt, at;
+                        bool hp = pred.TryGetValue(id, out pt), ha = actual.TryGetValue(id, out at);
+                        creatures++;
+                        if (hp == ha && (!hp || pt == at)) targetMatch++; else same = false;
+                    }
+                    if (same) sameSet++;
+                }
+            }
+            Console.WriteLine($"{files.Count} files, {turns} replies: whole reply predicted {Pct(sameSet, turns)}, per-creature action match {Pct(targetMatch, creatures)} ({creatures} creatures)");
+            return 0;
+        }
+
         private static double Final(SearchBattle search, GameState after)
         {
             double st = search.Eval.Score(after, 0);

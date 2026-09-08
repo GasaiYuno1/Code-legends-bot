@@ -13,12 +13,19 @@ namespace Locm
     {
         public static void Apply(string[] args, SearchBattle search, TextWriter log)
         {
-            var e = search.Eval;
             foreach (var arg in args)
             {
                 int eq = arg.IndexOf('=');
                 if (eq <= 0) continue;
                 string key = arg.Substring(0, eq).ToLowerInvariant();
+                var e = search.Eval;
+                if (key.StartsWith("o_"))
+                {
+                    // веса модели противника: o_hp=0.4 и т.п.
+                    if (ReferenceEquals(search.OppEval, search.Eval)) search.OppEval = Clone(search.Eval);
+                    e = search.OppEval;
+                    key = key.Substring(2);
+                }
                 if (key == "curve")
                 {
                     // curve=0.6,1.6,6.4,5.3,5.8,3.5,3.0,3.6 — целевая мана-кривая драфта
@@ -71,8 +78,19 @@ namespace Locm
                         if (log != null) log.WriteLine("unknown override: " + arg);
                         continue;
                 }
-                if (log != null) log.WriteLine("override " + key + "=" + v.ToString(CultureInfo.InvariantCulture));
+                if (log != null) log.WriteLine("override " + (ReferenceEquals(e, search.Eval) ? "" : "o_") + key + "=" + v.ToString(CultureInfo.InvariantCulture));
             }
+        }
+
+        public static Evaluator Clone(Evaluator e)
+        {
+            return new Evaluator
+            {
+                AttackW = e.AttackW, DefenseW = e.DefenseW, GuardW = e.GuardW, GuardDefW = e.GuardDefW, WardW = e.WardW, WardAtkW = e.WardAtkW,
+                LethalW = e.LethalW, DrainAtkW = e.DrainAtkW, BreakthroughAtkW = e.BreakthroughAtkW, ChargeW = e.ChargeW,
+                Fragile1W = e.Fragile1W, Fragile2W = e.Fragile2W, BlueHandW = e.BlueHandW, HpW = e.HpW, LowHpW = e.LowHpW, LowHp = e.LowHp,
+                HandCardW = e.HandCardW, HandRatingW = e.HandRatingW, OppDrawW = e.OppDrawW, MyDrawW = e.MyDrawW,
+            };
         }
     }
 }

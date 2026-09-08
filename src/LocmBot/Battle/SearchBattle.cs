@@ -32,6 +32,8 @@ namespace Locm
         }
 
         public readonly Evaluator Eval;
+        /// <summary>Оценка, которой противник выбирает ответ в модели (по умолчанию — копия моей; калибруется по его реальным ответам).</summary>
+        public Evaluator OppEval;
         /// <summary>Доля оценки «после ответа противника» в итоговой (остальное — статика).</summary>
         public double ReplyWeight = 0.75;
         /// <summary>Сколько лучших состояний переоценивать ответом противника.</summary>
@@ -70,6 +72,9 @@ namespace Locm
         private readonly HashSet<ulong> _oppVisited = new HashSet<ulong>();
         private readonly double[] _final = new double[4096];
         private int _oppNodes;
+        private readonly GameAction[] _oppLine = new GameAction[GameState.MaxBoard + 2];
+        private readonly GameAction[] _oppBestLine = new GameAction[GameState.MaxBoard + 2];
+        private int _oppBestLen;
         private double _oppBest;
         private double _oppBestMine;
         private int _oppMe;
@@ -102,6 +107,7 @@ namespace Locm
         public SearchBattle(Evaluator eval)
         {
             Eval = eval;
+            OppEval = eval;
             for (int i = 0; i < _pool.Length; i++) _pool[i] = new GameState();
             for (int i = 0; i < _legal.Length; i++)
             {
@@ -487,7 +493,7 @@ namespace Locm
                 int ai = o.FindCreature(_ids[i]);
                 if (ai < 0 || !o.Board[ai].CanAttack) continue;
                 int id = _ids[i];
-                double bestSc = Eval.Score(s, opp);
+                double bestSc = OppEval.Score(s, opp);
                 int bestTarget = int.MinValue;
                 bool guards = p.HasGuard();
                 if (!guards)
@@ -523,11 +529,20 @@ namespace Locm
             _oppVisited.Add(s.Hash());
             _oppNodes = 0;
             _oppMe = me;
-            _oppBest = Eval.Score(s, opp);
+            _oppBest = OppEval.Score(s, opp);
             _oppBestMine = Eval.Score(s, me);
             _replyBest.CopyFrom(s);
+            _oppBestLen = 0;
             OppDfs(0, opp);
             return _oppBestMine;
+        }
+
+        /// <summary>Предсказанные атаки противника (линия лучшего для него ответа по OppEval) после моего хода.</summary>
+        public void PredictReply(GameState after, int me, List<GameAction> into)
+        {
+            into.Clear();
+            DeepReplyScore(after, me);
+            for (int i = 0; i < _oppBestLen; i++) into.Add(_oppBestLine[i]);
         }
 
         /// <summary>
@@ -609,12 +624,15 @@ namespace Locm
                 child.Apply(a);
                 _oppNodes++;
                 if (!_oppVisited.Add(child.Hash())) continue;
-                double v = Eval.Score(child, opp);
+                _oppLine[depth] = a;
+                double v = OppEval.Score(child, opp);
                 if (v > _oppBest)
                 {
                     _oppBest = v;
-                    _oppBestMine = Eval.Score(child, _oppMe);   // оценка не строго антисимметрична (веса доборов), берём мою
+                    _oppBestMine = Eval.Score(child, _oppMe);   // итог всегда моей оценкой
                     _replyBest.CopyFrom(child);
+                    _oppBestLen = depth + 1;
+                    Array.Copy(_oppLine, _oppBestLine, _oppBestLen);
                 }
                 if (child.IsOver) continue;
                 OppDfs(depth + 1, opp);
@@ -625,7 +643,7 @@ namespace Locm
         {
             _tmp.CopyFrom(s);
             _tmp.Apply(GameAction.Attack(id, target));
-            return Eval.Score(_tmp, opp);
+            return OppEval.Score(_tmp, opp);
         }
 
         // Средняя позиция: 5 карт в руке, по 3 существа на столе, предметы — чтобы JIT собрал все ветки.

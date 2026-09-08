@@ -10,6 +10,21 @@ namespace Locm.Tests
         {
             if (args.Length > 0 && args[0] == "replay")
                 return ReplayMain(args);
+            if (args.Length > 0 && args[0] == "replycheck")
+            {
+                // replycheck <логи> [limit=N] [step=K] [key=value | o_key=value]
+                int limit = int.MaxValue, step = 1;
+                var paths = new System.Collections.Generic.List<string>();
+                var overrides = new System.Collections.Generic.List<string>();
+                for (int i = 1; i < args.Length; i++)
+                {
+                    if (args[i].StartsWith("limit=")) limit = int.Parse(args[i].Substring(6));
+                    else if (args[i].StartsWith("step=")) step = int.Parse(args[i].Substring(5));
+                    else if (args[i].Contains("=")) overrides.Add(args[i]);
+                    else paths.Add(args[i]);
+                }
+                return Compare.ReplyCheck(paths.ToArray(), overrides.ToArray(), limit, step);
+            }
             if (args.Length > 0 && args[0] == "draftcheck")
             {
                 var paths = new System.Collections.Generic.List<string>();
