@@ -29,8 +29,18 @@ namespace Locm.Tests
             }
             s.Players[0].Health = myHp;
             s.Players[1].Health = oppHp;
+            s.Players[0].NextRune = RuneBelow(myHp);
+            s.Players[1].NextRune = RuneBelow(oppHp);
             s.Players[1].Mana = 0;
             return s;
+        }
+
+        /// <summary>Как у арбитра: остаются только руны строго ниже здоровья.</summary>
+        public static int RuneBelow(int hp)
+        {
+            for (int r = 25; r > 0; r -= 5)
+                if (r < hp) return r;
+            return 0;
         }
 
         public static void Board(GameState s, int player, Card c, bool canAttack = true) =>

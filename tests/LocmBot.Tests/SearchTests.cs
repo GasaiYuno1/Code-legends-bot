@@ -148,3 +148,80 @@ namespace Locm.Tests
         }
     }
 }
+
+namespace Locm.Tests
+{
+    public static class ReplyModelTests
+    {
+        [Test]
+        public static void TradesInsteadOfRacingIntoLethal()
+        {
+            // Я 9 HP, у обоих по два 5/5. Статика любит удар в лицо (+4), но тогда противник бьёт на 10 и убивает.
+            var s = TestUtil.NewState(myHp: 9);
+            TestUtil.Board(s, 0, TestUtil.Cr(1, 5, 5));
+            TestUtil.Board(s, 0, TestUtil.Cr(2, 5, 5));
+            TestUtil.Board(s, 1, TestUtil.Cr(3, 5, 5), canAttack: false);
+            TestUtil.Board(s, 1, TestUtil.Cr(4, 5, 5), canAttack: false);
+            var search = new SearchBattle();
+            var line = new System.Collections.Generic.List<GameAction>(search.Search(s, new TurnClock(80)));
+            var after = s.Clone();
+            Assert.Equal(0, after.ApplySequence(line));
+            Assert.Equal(0, after.Players[1].BoardCount, "both enemy creatures must be traded off: " + TestUtil.Joined(line));
+            Assert.True(search.Rescored > 0, "candidates were rescored with the reply model");
+        }
+
+        [Test]
+        public static void ReplyScore_DetectsLethalThroughGuards()
+        {
+            var search = new SearchBattle();
+            var s = TestUtil.NewState(myHp: 9);
+            TestUtil.Board(s, 1, TestUtil.Cr(3, 5, 5), canAttack: false);
+            TestUtil.Board(s, 1, TestUtil.Cr(4, 5, 5), canAttack: false);
+            Assert.Equal(-Evaluator.WinScore, search.ReplyScore(s, 0));
+
+            TestUtil.Board(s, 0, TestUtil.Cr(1, 1, 1, "---G--"));
+            Assert.Equal(-Evaluator.WinScore, search.ReplyScore(s, 0), "10 - 1 >= 9 still lethal");
+
+            var s2 = TestUtil.NewState(myHp: 9);
+            TestUtil.Board(s2, 1, TestUtil.Cr(3, 5, 5), canAttack: false);
+            TestUtil.Board(s2, 1, TestUtil.Cr(4, 5, 5), canAttack: false);
+            TestUtil.Board(s2, 0, TestUtil.Cr(1, 1, 2, "---G--"));
+            Assert.True(search.ReplyScore(s2, 0) > -Evaluator.WinScore, "10 - 2 < 9: guard saves me");
+        }
+
+        [Test]
+        public static void ReplyScore_OpponentKillsFreeCreature()
+        {
+            // Мой 3/3 против их 4/4: после ответа противника мой 3/3 мёртв, их 4/4 остаётся с 1 защитой.
+            var search = new SearchBattle();
+            var s = TestUtil.NewState();
+            TestUtil.Board(s, 0, TestUtil.Cr(1, 3, 3), canAttack: false);
+            TestUtil.Board(s, 1, TestUtil.Cr(2, 4, 4), canAttack: false);
+            double withCreature = search.ReplyScore(s, 0);
+            double statik = search.Eval.Score(s, 0);
+            Assert.True(withCreature < statik, "reply must cost me the creature");
+
+            var s2 = TestUtil.NewState();
+            TestUtil.Board(s2, 1, TestUtil.Cr(2, 4, 4), canAttack: false);
+            double empty = search.ReplyScore(s2, 0);
+            Assert.True(empty < search.Eval.Score(s2, 0), "they hit face instead");
+        }
+
+        [Test]
+        public static void StillRespectsTimeBudget()
+        {
+            var s = TestUtil.NewState(mana: 12);
+            for (int i = 0; i < 6; i++) TestUtil.Board(s, 0, TestUtil.Cr(10 + i, 2 + i, 3 + i));
+            for (int i = 0; i < 6; i++) TestUtil.Board(s, 1, TestUtil.Cr(20 + i, 2 + i, 3 + i));
+            for (int i = 0; i < 4; i++) s.Players[0].AddHandCard(TestUtil.Item(CardType.RedItem, 30 + i, 0, -2, cost: 1));
+            for (int i = 0; i < 4; i++) s.Players[0].AddHandCard(TestUtil.Item(CardType.GreenItem, 40 + i, 2, 2, cost: 1));
+            var search = new SearchBattle();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var line = search.Search(s, new TurnClock(40));
+            sw.Stop();
+            Assert.True(sw.ElapsedMilliseconds < 120, "took " + sw.ElapsedMilliseconds + " ms");
+            Assert.True(search.Rescored > 0, "rescored " + search.Rescored);
+            Assert.Equal(0, s.Clone().ApplySequence(line));
+        }
+    }
+}

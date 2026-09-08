@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System;
@@ -96,7 +97,19 @@ namespace Locm
             public double Score;
         }
 
+        private sealed class Candidate
+        {
+            public readonly GameState State = new GameState();
+            public readonly GameAction[] Line = new GameAction[MaxDepth + 1];
+            public int Length;
+            public double Static;
+        }
+
         public readonly Evaluator Eval;
+        public double ReplyWeight = 0.75;
+        public int MaxCandidates = 1024;
+        public double Phase1Share = 0.6;
+
         private readonly GameState[] _pool = new GameState[MaxDepth + 2];
         private readonly List<GameAction>[] _legal = new List<GameAction>[MaxDepth + 1];
         private readonly Child[][] _children = new Child[MaxDepth + 1][];
@@ -104,17 +117,27 @@ namespace Locm
         private readonly GameAction[] _line = new GameAction[MaxDepth + 1];
         private readonly GameAction[] _bestLine = new GameAction[MaxDepth + 1];
         private readonly List<GameAction> _answer = new List<GameAction>();
+        private Candidate[] _heap;
+        private int _heapCount;
+        private readonly GameState _scratch = new GameState();
+        private readonly GameState _tmp = new GameState();
+        private readonly int[] _order = new int[GameState.MaxBoard];
+        private readonly int[] _ids = new int[GameState.MaxBoard];
         private int _bestLen;
         private double _best;
         private int _rootBoard;
         private TurnClock _clock;
+        private long _phase1Deadline;
         private bool _stop;
+        private bool _won;
         private long _nodes;
         private int _battleTurn = -1;
         private bool _second;
         private bool _sideKnown;
 
         public long Nodes => _nodes;
+        public int Candidates { get; private set; }
+        public int Rescored { get; private set; }
         public double BestScore => _best;
         public bool TimedOut { get; private set; }
 
@@ -156,17 +179,32 @@ namespace Locm
 
         public List<GameAction> Search(GameState root, TurnClock clock)
         {
+            EnsureHeap();
             _clock = clock;
+            _phase1Deadline = clock.ElapsedMs + (long)(clock.RemainingMs * Phase1Share);
             _stop = false;
+            _won = false;
             TimedOut = false;
             _nodes = 0;
+            _heapCount = 0;
+            Rescored = 0;
             _visited.Clear();
             if (!ReferenceEquals(root, _pool[0])) _pool[0].CopyFrom(root);
+            int me = _pool[0].Current;
             _rootBoard = _pool[0].Me.BoardCount;
-            _best = Eval.Score(_pool[0], _pool[0].Current);
+            _best = Eval.Score(_pool[0], me);
             _bestLen = 0;
             _visited.Add(_pool[0].Hash());
-            if (!_pool[0].IsOver) Dfs(0);
+
+            if (!_pool[0].IsOver)
+            {
+                _line[0] = GameAction.Pass;
+                AddCandidate(_pool[0], _best, 0);
+                Dfs(0);
+            }
+            Candidates = _heapCount;
+
+            if (!_won && !_pool[0].IsOver) Rescore(me);
 
             _answer.Clear();
             for (int i = 0; i < _bestLen; i++) _answer.Add(_bestLine[i]);
@@ -203,9 +241,18 @@ namespace Locm
                 }
                 if (child.IsOver)
                 {
-                    if (child.Winner == me) _stop = true;
+                    if (child.Winner == me)
+                    {
+                        _stop = true;
+                        _won = true;
+                        _best = v;
+                        _bestLen = depth + 1;
+                        Array.Copy(_line, _bestLine, _bestLen);
+                        return;
+                    }
                     continue;
                 }
+                AddCandidate(child, v, depth + 1);
                 kids[n].Action = a;
                 kids[n].Score = v;
                 n++;
@@ -222,7 +269,7 @@ namespace Locm
 
             for (int i = 0; i < n; i++)
             {
-                if ((++_nodes & 31) == 0 && _clock.TimeUp)
+                if ((++_nodes & 31) == 0 && _clock.ElapsedMs >= _phase1Deadline)
                 {
                     TimedOut = true;
                     _stop = true;
@@ -247,6 +294,171 @@ namespace Locm
                 default:
                     return true;
             }
+        }
+
+        private void EnsureHeap()
+        {
+            if (_heap != null && _heap.Length == MaxCandidates) return;
+            _heap = new Candidate[MaxCandidates];
+            for (int i = 0; i < _heap.Length; i++) _heap[i] = new Candidate();
+            _heapCount = 0;
+        }
+
+        private void AddCandidate(GameState state, double score, int lineLen)
+        {
+            Candidate c;
+            if (_heapCount < _heap.Length)
+            {
+                c = _heap[_heapCount++];
+                Fill(c, state, score, lineLen);
+                SiftUp(_heapCount - 1);
+            }
+            else
+            {
+                if (score <= _heap[0].Static) return;
+                c = _heap[0];
+                Fill(c, state, score, lineLen);
+                SiftDown(0);
+            }
+        }
+
+        private void Fill(Candidate c, GameState state, double score, int lineLen)
+        {
+            c.State.CopyFrom(state);
+            c.Static = score;
+            c.Length = lineLen;
+            Array.Copy(_line, c.Line, lineLen);
+        }
+
+        private void SiftUp(int i)
+        {
+            while (i > 0)
+            {
+                int parent = (i - 1) >> 1;
+                if (_heap[parent].Static <= _heap[i].Static) break;
+                Swap(parent, i);
+                i = parent;
+            }
+        }
+
+        private void SiftDown(int i)
+        {
+            while (true)
+            {
+                int l = 2 * i + 1, r = l + 1, m = i;
+                if (l < _heapCount && _heap[l].Static < _heap[m].Static) m = l;
+                if (r < _heapCount && _heap[r].Static < _heap[m].Static) m = r;
+                if (m == i) return;
+                Swap(m, i);
+                i = m;
+            }
+        }
+
+        private void Swap(int a, int b)
+        {
+            Candidate t = _heap[a];
+            _heap[a] = _heap[b];
+            _heap[b] = t;
+        }
+
+        private void Rescore(int me)
+        {
+            int n = _heapCount;
+            Array.Sort(_heap, 0, n, StaticDesc.Instance);
+
+            double bestFinal = double.NegativeInfinity;
+            int bestIdx = -1;
+            for (int i = 0; i < n; i++)
+            {
+                if ((i & 7) == 7 && _clock.TimeUp)
+                {
+                    TimedOut = true;
+                    break;
+                }
+                Candidate c = _heap[i];
+                double reply = ReplyScore(c.State, me);
+                double final = ReplyWeight * reply + (1 - ReplyWeight) * c.Static;
+                Rescored++;
+                if (final > bestFinal)
+                {
+                    bestFinal = final;
+                    bestIdx = i;
+                }
+            }
+            if (bestIdx < 0) return;
+            Candidate b = _heap[bestIdx];
+            _best = bestFinal;
+            _bestLen = b.Length;
+            Array.Copy(b.Line, _bestLine, b.Length);
+            _heapCount = 0;
+        }
+
+        private sealed class StaticDesc : IComparer<Candidate>
+        {
+            public static readonly StaticDesc Instance = new StaticDesc();
+            public int Compare(Candidate a, Candidate b) => b.Static.CompareTo(a.Static);
+        }
+
+        public double ReplyScore(GameState after, int me)
+        {
+            if (after.IsOver) return Eval.Score(after, me);
+            var s = _scratch;
+            s.CopyFrom(after);
+            s.EndTurn();
+            if (s.IsOver) return Eval.Score(s, me);
+
+            int opp = s.Current;
+            var o = s.Players[opp];
+            var p = s.Players[me];
+
+            int totalAttack = 0;
+            for (int i = 0; i < o.BoardCount; i++) totalAttack += o.Board[i].Attack;
+            int guardDefense = 0;
+            for (int i = 0; i < p.BoardCount; i++)
+                if (p.Board[i].Has(Abilities.Guard)) guardDefense += p.Board[i].Defense;
+            if (totalAttack - guardDefense >= p.Health) return -Evaluator.WinScore;
+
+            int n = o.BoardCount;
+            for (int i = 0; i < n; i++) _order[i] = i;
+            for (int i = 1; i < n; i++)
+            {
+                int k = _order[i];
+                int j = i - 1;
+                while (j >= 0 && o.Board[_order[j]].Attack < o.Board[k].Attack) { _order[j + 1] = _order[j]; j--; }
+                _order[j + 1] = k;
+            }
+            for (int i = 0; i < n; i++) _ids[i] = o.Board[_order[i]].InstanceId;
+
+            for (int i = 0; i < n && !s.IsOver; i++)
+            {
+                int ai = o.FindCreature(_ids[i]);
+                if (ai < 0 || !o.Board[ai].CanAttack) continue;
+                int id = _ids[i];
+                double bestSc = Eval.Score(s, opp);
+                int bestTarget = int.MinValue;
+                bool guards = p.HasGuard();
+                if (!guards)
+                {
+                    double sc = TryAttack(s, id, GameAction.Face, opp);
+                    if (sc > bestSc) { bestSc = sc; bestTarget = GameAction.Face; }
+                }
+                for (int t = 0; t < p.BoardCount; t++)
+                {
+                    if (guards && !p.Board[t].Has(Abilities.Guard)) continue;
+                    int tid = p.Board[t].InstanceId;
+                    double sc = TryAttack(s, id, tid, opp);
+                    if (sc > bestSc) { bestSc = sc; bestTarget = tid; }
+                }
+                if (bestTarget != int.MinValue) s.Apply(GameAction.Attack(id, bestTarget));
+            }
+            return Eval.Score(s, me);
+        }
+
+        private double TryAttack(GameState s, int id, int target, int opp)
+        {
+            _tmp.CopyFrom(s);
+            _tmp.Apply(GameAction.Attack(id, target));
+            return Eval.Score(_tmp, opp);
         }
 
         private const string WarmUpPosition =
@@ -1123,13 +1335,45 @@ namespace Locm
     {
         private const bool DumpInput = false;
 
-        public static void Main()
+        public static void Main(string[] args)
         {
             var stdout = new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = false };
             var stderr = Console.Error;
 
-            var bot = new Bot(new RatingDraft(), new SearchBattle(), stderr, DumpInput ? stderr : null);
+            var search = new SearchBattle();
+            ApplyOverrides(args, search, stderr);
+            var bot = new Bot(new RatingDraft(), search, stderr, DumpInput ? stderr : null);
             bot.Run(Console.In, stdout);
+        }
+
+        private static void ApplyOverrides(string[] args, SearchBattle search, TextWriter log)
+        {
+            var e = search.Eval;
+            foreach (var arg in args)
+            {
+                int eq = arg.IndexOf('=');
+                if (eq <= 0) continue;
+                string key = arg.Substring(0, eq).ToLowerInvariant();
+                double v;
+                if (!double.TryParse(arg.Substring(eq + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out v)) continue;
+                switch (key)
+                {
+                    case "hp": e.HpW = v; break;
+                    case "lowhp": e.LowHpW = v; break;
+                    case "lowhpat": e.LowHp = (int)v; break;
+                    case "atk": e.AttackW = v; break;
+                    case "def": e.DefenseW = v; break;
+                    case "guard": e.GuardW = v; break;
+                    case "ward": e.WardW = v; break;
+                    case "lethal": e.LethalW = v; break;
+                    case "hand": e.HandCardW = v; break;
+                    case "oppdraw": e.OppDrawW = v; break;
+                    case "reply": search.ReplyWeight = v; break;
+                    case "cand": search.MaxCandidates = (int)v; break;
+                    default: log.WriteLine("unknown override: " + arg); continue;
+                }
+                log.WriteLine("override " + key + "=" + v.ToString(CultureInfo.InvariantCulture));
+            }
         }
     }
 }
