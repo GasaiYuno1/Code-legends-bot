@@ -47,6 +47,8 @@ namespace Locm
                     case "wardatk": e.WardAtkW = v; break;
                     case "lethal": e.LethalW = v; break;
                     case "drain": e.DrainAtkW = v; break;
+                    case "breakthrough": e.BreakthroughAtkW = v; break;
+                    case "charge": e.ChargeW = v; break;
                     case "hand": e.HandCardW = v; break;
                     case "handrating": e.HandRatingW = v; break;
                     case "fragile1": e.Fragile1W = v; break;
