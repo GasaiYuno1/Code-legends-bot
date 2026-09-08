@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-BOT = ROOT / "build" / "bot-spsa" / "LocmBot.dll"   # эталон = текущая версия арены (SPSA-веса + selfw=20)
+BOT = ROOT / "build" / "bot-spsa2" / "LocmBot.dll"   # эталон = текущая версия (раунд 2)
 CLASSES = ROOT / "build" / "refcheck-classes"
 RESOURCES = Path("/home/user/codingame/legendsofcodeandmagic/src/main/resources")
 OUT = ROOT / "build" / "spsa"
