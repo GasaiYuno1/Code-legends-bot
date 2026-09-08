@@ -30,7 +30,8 @@ dotnet run --project tests/LocmBot.Tests -- replay <файлы|каталог>  
 tools/refcheck/run.sh <клон LegendsOfCodeAndMagic> [seed] [игр] [каталог] # новые логи движком арбитра (Java 17+)
 tools/refcheck/match.sh <клон> <игр> <seed> "<cmd A>" "<cmd B>" [логи]  # матчи; cmd = "dotnet src/LocmBot/bin/Release/net8.0/LocmBot.dll" или random
 python3 tools/gen_carddb.py                                              # referee/cardlist.txt -> Game/CardDb.cs
-python3 tools/bundle.py                                                  # -> dist/codingame.cs
+python3 tools/bundle.py                                                  # -> dist/codingame.cs (без комментариев, чистый ASCII; файл в git — пересобирать перед пушем)
+python3 tools/paste_page.py                                              # -> build/paste.html: страница «скопировать код» для телефона (публикуется как артефакт)
 ```
 Формат лога сверки: блоки «ввод арбитра как есть» + строка `> ответ бота`; строки с `#` и пустые игнорируются; ходы драфта пропускаются.
 

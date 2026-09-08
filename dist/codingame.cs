@@ -14,19 +14,19 @@ namespace Locm
         public double AttackW = 1.0;
         public double DefenseW = 0.8;
         public double GuardW = 0.8;
-        public double GuardDefW = 0.25;      // Guard тем ценнее, чем толще
+        public double GuardDefW = 0.25;
         public double WardW = 1.2;
-        public double WardAtkW = 0.3;        // Ward на большой атаке — почти гарантированный размен
+        public double WardAtkW = 0.3;
         public double LethalW = 1.5;
         public double DrainAtkW = 0.3;
         public double BreakthroughAtkW = 0.15;
         public double ChargeW = 0.2;
-        public double HpW = 0.4;             // за 1 HP
-        public double LowHpW = 0.8;          // дополнительно за 1 HP ниже LowHp
+        public double HpW = 0.4;
+        public double LowHpW = 0.8;
         public int LowHp = 10;
-        public double HandCardW = 1.0;       // карта в руке (не разыгранная) — небольшая ценность
-        public double OppDrawW = 1.5;        // каждая лишняя карта противника за пробитые руны
-        public double MyDrawW = 1.2;         // мой лишний добор (эффекты карт)
+        public double HandCardW = 1.0;
+        public double OppDrawW = 1.5;
+        public double MyDrawW = 1.2;
 
         public double Creature(in Creature c)
         {
@@ -203,7 +203,7 @@ namespace Locm
                 }
                 if (child.IsOver)
                 {
-                    if (child.Winner == me) _stop = true;   // победа найдена — лучше не бывает
+                    if (child.Winner == me) _stop = true;
                     continue;
                 }
                 kids[n].Action = a;
@@ -382,26 +382,26 @@ namespace Locm
     {
         public static double AttackW = 1.0;
         public static double DefenseW = 1.0;
-        public static double BodyW = 0.06;         // бонус за «большое тело»: atk*def — 7/4 сильнее двух 3/2
+        public static double BodyW = 0.06;
         public static double GuardW = 1.0;
         public static double GuardDefW = 0.2;
         public static double WardW = 1.5;
         public static double WardAtkW = 0.3;
-        public static double LethalW = 4.0;        // Lethal = размен с чем угодно
-        public static double LethalAtkW = -0.3;    // на большой атаке почти лишний
-        public static double ChargeLethalW = 3.5;  // Charge+Lethal = мгновенное удаление любого существа
+        public static double LethalW = 4.0;
+        public static double LethalAtkW = -0.3;
+        public static double ChargeLethalW = 3.5;
         public static double DrainAtkW = 0.3;
         public static double BreakthroughAtkW = 0.2;
         public static double ChargeW = 0.8;
         public static double ChargeAtkW = 0.2;
         public static double DrawW = 2.0;
-        public static double OppDamageW = 0.4;    // за 1 урона противнику при розыгрыше
-        public static double MyHealW = 0.25;      // за 1 своего лечения
-        public static double ItemDamageW = 1.4;   // урон предмета по существу, за единицу (с потолком)
+        public static double OppDamageW = 0.4;
+        public static double MyHealW = 0.25;
+        public static double ItemDamageW = 1.4;
         public static int ItemDamageCap = 8;
         public static double ItemRemoveAllW = 2.0;
         public static double ItemRemoveGuardW = 0.5;
-        public static double BlueFlexW = 1.0;      // синий с уроном можно бить и в лицо
+        public static double BlueFlexW = 1.0;
 
         public static double Par(int cost) => 2.0 * cost + 2.0;
 
@@ -474,10 +474,10 @@ namespace Locm
     public sealed class RatingDraft : IDraftStrategy
     {
         public readonly int[] TargetCurve = { 0, 4, 7, 6, 5, 4, 2, 2 };
-        public double CurveW = 0.6;          // бонус/штраф за карту недобора/перебора
+        public double CurveW = 0.6;
         public int MaxItems = 8;
         public double ItemOverPenalty = 3.0;
-        public int MaxSameCard = 2;          // третья копия одной карты — штраф
+        public int MaxSameCard = 2;
         public double SameCardPenalty = 1.5;
 
         private readonly int[] _curve = new int[8];
@@ -593,8 +593,8 @@ namespace Locm
 
     public readonly struct Card
     {
-        public readonly int Number;        // cardNumber — id карты в наборе из 160 (baseId)
-        public readonly int InstanceId;    // уникальный id экземпляра в партии (-1 у карт из CardDb)
+        public readonly int Number;
+        public readonly int InstanceId;
         public readonly Location Location;
         public readonly CardType Type;
         public readonly int Cost;
@@ -660,166 +660,166 @@ namespace Locm
         private static Card[] Build()
         {
             var c = new Card[Count];
-            c[0] = new Card(1, -1, Location.MyHand, CardType.Creature, 1, 2, 1, Abilities.None, 1, 0, 0); // Slimer
-            c[1] = new Card(2, -1, Location.MyHand, CardType.Creature, 1, 1, 2, Abilities.None, 0, -1, 0); // Scuttler
-            c[2] = new Card(3, -1, Location.MyHand, CardType.Creature, 1, 2, 2, Abilities.None, 0, 0, 0); // Beavrat
-            c[3] = new Card(4, -1, Location.MyHand, CardType.Creature, 2, 1, 5, Abilities.None, 0, 0, 0); // Plated Toad
-            c[4] = new Card(5, -1, Location.MyHand, CardType.Creature, 2, 4, 1, Abilities.None, 0, 0, 0); // Grime Gnasher
-            c[5] = new Card(6, -1, Location.MyHand, CardType.Creature, 2, 3, 2, Abilities.None, 0, 0, 0); // Murgling
-            c[6] = new Card(7, -1, Location.MyHand, CardType.Creature, 2, 2, 2, Abilities.Ward, 0, 0, 0); // Rootkin Sapling
-            c[7] = new Card(8, -1, Location.MyHand, CardType.Creature, 2, 2, 3, Abilities.None, 0, 0, 0); // Psyshroom
-            c[8] = new Card(9, -1, Location.MyHand, CardType.Creature, 3, 3, 4, Abilities.None, 0, 0, 0); // Corrupted Beavrat
-            c[9] = new Card(10, -1, Location.MyHand, CardType.Creature, 3, 3, 1, Abilities.Drain, 0, 0, 0); // Carnivorous Bush
-            c[10] = new Card(11, -1, Location.MyHand, CardType.Creature, 3, 5, 2, Abilities.None, 0, 0, 0); // Snowsaur
-            c[11] = new Card(12, -1, Location.MyHand, CardType.Creature, 3, 2, 5, Abilities.None, 0, 0, 0); // Woodshroom
-            c[12] = new Card(13, -1, Location.MyHand, CardType.Creature, 4, 5, 3, Abilities.None, 1, -1, 0); // Swamp Terror
-            c[13] = new Card(14, -1, Location.MyHand, CardType.Creature, 4, 9, 1, Abilities.None, 0, 0, 0); // Fanged Lunger
-            c[14] = new Card(15, -1, Location.MyHand, CardType.Creature, 4, 4, 5, Abilities.None, 0, 0, 0); // Pouncing Flailmouth
-            c[15] = new Card(16, -1, Location.MyHand, CardType.Creature, 4, 6, 2, Abilities.None, 0, 0, 0); // Wrangler Fish
-            c[16] = new Card(17, -1, Location.MyHand, CardType.Creature, 4, 4, 5, Abilities.None, 0, 0, 0); // Ash Walker
-            c[17] = new Card(18, -1, Location.MyHand, CardType.Creature, 4, 7, 4, Abilities.None, 0, 0, 0); // Acid Golem
-            c[18] = new Card(19, -1, Location.MyHand, CardType.Creature, 5, 5, 6, Abilities.None, 0, 0, 0); // Foulbeast
-            c[19] = new Card(20, -1, Location.MyHand, CardType.Creature, 5, 8, 2, Abilities.None, 0, 0, 0); // Hedge Demon
-            c[20] = new Card(21, -1, Location.MyHand, CardType.Creature, 5, 6, 5, Abilities.None, 0, 0, 0); // Crested Scuttler
-            c[21] = new Card(22, -1, Location.MyHand, CardType.Creature, 6, 7, 5, Abilities.None, 0, 0, 0); // Sigbovak
-            c[22] = new Card(23, -1, Location.MyHand, CardType.Creature, 7, 8, 8, Abilities.None, 0, 0, 0); // Titan Cave Hog
-            c[23] = new Card(24, -1, Location.MyHand, CardType.Creature, 1, 1, 1, Abilities.None, 0, -1, 0); // Exploding Skitterbug
-            c[24] = new Card(25, -1, Location.MyHand, CardType.Creature, 2, 3, 1, Abilities.None, -2, -2, 0); // Spiney Chompleaf
-            c[25] = new Card(26, -1, Location.MyHand, CardType.Creature, 2, 3, 2, Abilities.None, 0, -1, 0); // Razor Crab
-            c[26] = new Card(27, -1, Location.MyHand, CardType.Creature, 2, 2, 2, Abilities.None, 2, 0, 0); // Nut Gatherer
-            c[27] = new Card(28, -1, Location.MyHand, CardType.Creature, 2, 1, 2, Abilities.None, 0, 0, 1); // Infested Toad
-            c[28] = new Card(29, -1, Location.MyHand, CardType.Creature, 2, 2, 1, Abilities.None, 0, 0, 1); // Steelplume Nestling
-            c[29] = new Card(30, -1, Location.MyHand, CardType.Creature, 3, 4, 2, Abilities.None, 0, -2, 0); // Venomous Bog Hopper
-            c[30] = new Card(31, -1, Location.MyHand, CardType.Creature, 3, 3, 1, Abilities.None, 0, -1, 0); // Woodland Hunter
-            c[31] = new Card(32, -1, Location.MyHand, CardType.Creature, 3, 3, 2, Abilities.None, 0, 0, 1); // Sandsplat
-            c[32] = new Card(33, -1, Location.MyHand, CardType.Creature, 4, 4, 3, Abilities.None, 0, 0, 1); // Chameleskulk
-            c[33] = new Card(34, -1, Location.MyHand, CardType.Creature, 5, 3, 5, Abilities.None, 0, 0, 1); // Eldritch Cyclops
-            c[34] = new Card(35, -1, Location.MyHand, CardType.Creature, 6, 5, 2, Abilities.Breakthrough, 0, 0, 1); // Snail-eyed Hulker
-            c[35] = new Card(36, -1, Location.MyHand, CardType.Creature, 6, 4, 4, Abilities.None, 0, 0, 2); // Possessed Skull
-            c[36] = new Card(37, -1, Location.MyHand, CardType.Creature, 6, 5, 7, Abilities.None, 0, 0, 1); // Eldritch Multiclops
-            c[37] = new Card(38, -1, Location.MyHand, CardType.Creature, 1, 1, 3, Abilities.Drain, 0, 0, 0); // Imp
-            c[38] = new Card(39, -1, Location.MyHand, CardType.Creature, 1, 2, 1, Abilities.Drain, 0, 0, 0); // Voracious Imp
-            c[39] = new Card(40, -1, Location.MyHand, CardType.Creature, 3, 2, 3, Abilities.Drain | Abilities.Guard, 0, 0, 0); // Rock Gobbler
-            c[40] = new Card(41, -1, Location.MyHand, CardType.Creature, 3, 2, 2, Abilities.Charge | Abilities.Drain, 0, 0, 0); // Blizzard Demon
-            c[41] = new Card(42, -1, Location.MyHand, CardType.Creature, 4, 4, 2, Abilities.Drain, 0, 0, 0); // Flying Leech
-            c[42] = new Card(43, -1, Location.MyHand, CardType.Creature, 6, 5, 5, Abilities.Drain, 0, 0, 0); // Screeching Nightmare
-            c[43] = new Card(44, -1, Location.MyHand, CardType.Creature, 6, 3, 7, Abilities.Drain | Abilities.Lethal, 0, 0, 0); // Deathstalker
-            c[44] = new Card(45, -1, Location.MyHand, CardType.Creature, 6, 6, 5, Abilities.Breakthrough | Abilities.Drain, -3, 0, 0); // Night Howler
-            c[45] = new Card(46, -1, Location.MyHand, CardType.Creature, 9, 7, 7, Abilities.Drain, 0, 0, 0); // Soul Devourer
-            c[46] = new Card(47, -1, Location.MyHand, CardType.Creature, 2, 1, 5, Abilities.Drain, 0, 0, 0); // Gnipper
-            c[47] = new Card(48, -1, Location.MyHand, CardType.Creature, 1, 1, 1, Abilities.Lethal, 0, 0, 0); // Venom Hedgehog
-            c[48] = new Card(49, -1, Location.MyHand, CardType.Creature, 2, 1, 2, Abilities.Guard | Abilities.Lethal, 0, 0, 0); // Shiny Prowler
-            c[49] = new Card(50, -1, Location.MyHand, CardType.Creature, 3, 3, 2, Abilities.Lethal, 0, 0, 0); // Puff Biter
-            c[50] = new Card(51, -1, Location.MyHand, CardType.Creature, 4, 3, 5, Abilities.Lethal, 0, 0, 0); // Elite Bilespitter
-            c[51] = new Card(52, -1, Location.MyHand, CardType.Creature, 4, 2, 4, Abilities.Lethal, 0, 0, 0); // Bilespitter
-            c[52] = new Card(53, -1, Location.MyHand, CardType.Creature, 4, 1, 1, Abilities.Charge | Abilities.Lethal, 0, 0, 0); // Possessed Abomination
-            c[53] = new Card(54, -1, Location.MyHand, CardType.Creature, 3, 2, 2, Abilities.Lethal, 0, 0, 0); // Shadow Biter
-            c[54] = new Card(55, -1, Location.MyHand, CardType.Creature, 2, 0, 5, Abilities.Guard, 0, 0, 0); // Hermit Slime
-            c[55] = new Card(56, -1, Location.MyHand, CardType.Creature, 4, 2, 7, Abilities.None, 0, 0, 0); // Giant Louse
-            c[56] = new Card(57, -1, Location.MyHand, CardType.Creature, 4, 1, 8, Abilities.None, 0, 0, 0); // Dream-Eater
-            c[57] = new Card(58, -1, Location.MyHand, CardType.Creature, 6, 5, 6, Abilities.Breakthrough, 0, 0, 0); // Darkscale Predator
-            c[58] = new Card(59, -1, Location.MyHand, CardType.Creature, 7, 7, 7, Abilities.None, 1, -1, 0); // Sea Ghost
-            c[59] = new Card(60, -1, Location.MyHand, CardType.Creature, 7, 4, 8, Abilities.None, 0, 0, 0); // Gritsuck Troll
-            c[60] = new Card(61, -1, Location.MyHand, CardType.Creature, 9, 10, 10, Abilities.None, 0, 0, 0); // Alpha Troll
-            c[61] = new Card(62, -1, Location.MyHand, CardType.Creature, 12, 12, 12, Abilities.Breakthrough | Abilities.Guard, 0, 0, 0); // Mutant Troll
-            c[62] = new Card(63, -1, Location.MyHand, CardType.Creature, 2, 0, 4, Abilities.Guard | Abilities.Ward, 0, 0, 0); // Rootkin Drone
-            c[63] = new Card(64, -1, Location.MyHand, CardType.Creature, 2, 1, 1, Abilities.Guard | Abilities.Ward, 0, 0, 0); // Coppershell Tortoise
-            c[64] = new Card(65, -1, Location.MyHand, CardType.Creature, 2, 2, 2, Abilities.Ward, 0, 0, 0); // Steelplume Defender
-            c[65] = new Card(66, -1, Location.MyHand, CardType.Creature, 5, 5, 1, Abilities.Ward, 0, 0, 0); // Staring Wickerbeast
-            c[66] = new Card(67, -1, Location.MyHand, CardType.Creature, 6, 5, 5, Abilities.Ward, 0, -2, 0); // Flailing Hammerhead
-            c[67] = new Card(68, -1, Location.MyHand, CardType.Creature, 6, 7, 5, Abilities.Ward, 0, 0, 0); // Giant Squid
-            c[68] = new Card(69, -1, Location.MyHand, CardType.Creature, 3, 4, 4, Abilities.Breakthrough, 0, 0, 0); // Charging Boarhound
-            c[69] = new Card(70, -1, Location.MyHand, CardType.Creature, 4, 6, 3, Abilities.Breakthrough, 0, 0, 0); // Murglord
-            c[70] = new Card(71, -1, Location.MyHand, CardType.Creature, 4, 3, 2, Abilities.Breakthrough | Abilities.Charge, 0, 0, 0); // Flying Murgling
-            c[71] = new Card(72, -1, Location.MyHand, CardType.Creature, 4, 5, 3, Abilities.Breakthrough, 0, 0, 0); // Shuffling Nightmare
-            c[72] = new Card(73, -1, Location.MyHand, CardType.Creature, 4, 4, 4, Abilities.Breakthrough, 4, 0, 0); // Bog Bounder
-            c[73] = new Card(74, -1, Location.MyHand, CardType.Creature, 5, 5, 4, Abilities.Breakthrough | Abilities.Guard, 0, 0, 0); // Crusher
-            c[74] = new Card(75, -1, Location.MyHand, CardType.Creature, 5, 6, 5, Abilities.Breakthrough, 0, 0, 0); // Titan Prowler
-            c[75] = new Card(76, -1, Location.MyHand, CardType.Creature, 6, 5, 5, Abilities.Breakthrough | Abilities.Drain, 0, 0, 0); // Crested Chomper
-            c[76] = new Card(77, -1, Location.MyHand, CardType.Creature, 7, 7, 7, Abilities.Breakthrough, 0, 0, 0); // Lumbering Giant
-            c[77] = new Card(78, -1, Location.MyHand, CardType.Creature, 8, 5, 5, Abilities.Breakthrough, 0, -5, 0); // Shambler
-            c[78] = new Card(79, -1, Location.MyHand, CardType.Creature, 8, 8, 8, Abilities.Breakthrough, 0, 0, 0); // Scarlet Colossus
-            c[79] = new Card(80, -1, Location.MyHand, CardType.Creature, 8, 8, 8, Abilities.Breakthrough | Abilities.Guard, 0, 0, 1); // Corpse Guzzler
-            c[80] = new Card(81, -1, Location.MyHand, CardType.Creature, 9, 6, 6, Abilities.Breakthrough | Abilities.Charge, 0, 0, 0); // Flying Corpse Guzzler
-            c[81] = new Card(82, -1, Location.MyHand, CardType.Creature, 7, 5, 5, Abilities.Breakthrough | Abilities.Drain | Abilities.Ward, 0, 0, 0); // Slithering Nightmare
-            c[82] = new Card(83, -1, Location.MyHand, CardType.Creature, 0, 1, 1, Abilities.Charge, 0, 0, 0); // Restless Owl
-            c[83] = new Card(84, -1, Location.MyHand, CardType.Creature, 2, 1, 1, Abilities.Charge | Abilities.Drain | Abilities.Ward, 0, 0, 0); // Fighter Tick
-            c[84] = new Card(85, -1, Location.MyHand, CardType.Creature, 3, 2, 3, Abilities.Charge, 0, 0, 0); // Heartless Crow
-            c[85] = new Card(86, -1, Location.MyHand, CardType.Creature, 3, 1, 5, Abilities.Charge, 0, 0, 0); // Crazed Nose-pincher
-            c[86] = new Card(87, -1, Location.MyHand, CardType.Creature, 4, 2, 5, Abilities.Charge | Abilities.Guard, 0, 0, 0); // Bloat Demon
-            c[87] = new Card(88, -1, Location.MyHand, CardType.Creature, 5, 4, 4, Abilities.Charge, 0, 0, 0); // Abyss Nightmare
-            c[88] = new Card(89, -1, Location.MyHand, CardType.Creature, 5, 4, 1, Abilities.Charge, 2, 0, 0); // Boombeak
-            c[89] = new Card(90, -1, Location.MyHand, CardType.Creature, 8, 5, 5, Abilities.Charge, 0, 0, 0); // Eldritch Swooper
-            c[90] = new Card(91, -1, Location.MyHand, CardType.Creature, 0, 1, 2, Abilities.Guard, 0, 1, 0); // Flumpy
-            c[91] = new Card(92, -1, Location.MyHand, CardType.Creature, 1, 0, 1, Abilities.Guard, 2, 0, 0); // Wurm
-            c[92] = new Card(93, -1, Location.MyHand, CardType.Creature, 1, 2, 1, Abilities.Guard, 0, 0, 0); // Spinekid
-            c[93] = new Card(94, -1, Location.MyHand, CardType.Creature, 2, 1, 4, Abilities.Guard, 0, 0, 0); // Rootkin Defender
-            c[94] = new Card(95, -1, Location.MyHand, CardType.Creature, 2, 2, 3, Abilities.Guard, 0, 0, 0); // Wildum
-            c[95] = new Card(96, -1, Location.MyHand, CardType.Creature, 2, 3, 2, Abilities.Guard, 0, 0, 0); // Prairie Protector
-            c[96] = new Card(97, -1, Location.MyHand, CardType.Creature, 3, 3, 3, Abilities.Guard, 0, 0, 0); // Turta
-            c[97] = new Card(98, -1, Location.MyHand, CardType.Creature, 3, 2, 4, Abilities.Guard, 0, 0, 0); // Lilly Hopper
-            c[98] = new Card(99, -1, Location.MyHand, CardType.Creature, 3, 2, 5, Abilities.Guard, 0, 0, 0); // Cave Crab
-            c[99] = new Card(100, -1, Location.MyHand, CardType.Creature, 3, 1, 6, Abilities.Guard, 0, 0, 0); // Stalagopod
-            c[100] = new Card(101, -1, Location.MyHand, CardType.Creature, 4, 3, 4, Abilities.Guard, 0, 0, 0); // Engulfer
-            c[101] = new Card(102, -1, Location.MyHand, CardType.Creature, 4, 3, 3, Abilities.Guard, 0, -1, 0); // Mole Demon
-            c[102] = new Card(103, -1, Location.MyHand, CardType.Creature, 4, 3, 6, Abilities.Guard, 0, 0, 0); // Mutating Rootkin
-            c[103] = new Card(104, -1, Location.MyHand, CardType.Creature, 4, 4, 4, Abilities.Guard, 0, 0, 0); // Deepwater Shellcrab
-            c[104] = new Card(105, -1, Location.MyHand, CardType.Creature, 5, 4, 6, Abilities.Guard, 0, 0, 0); // King Shellcrab
-            c[105] = new Card(106, -1, Location.MyHand, CardType.Creature, 5, 5, 5, Abilities.Guard, 0, 0, 0); // Far-reaching Nightmare
-            c[106] = new Card(107, -1, Location.MyHand, CardType.Creature, 5, 3, 3, Abilities.Guard, 3, 0, 0); // Worker Shellcrab
-            c[107] = new Card(108, -1, Location.MyHand, CardType.Creature, 5, 2, 6, Abilities.Guard, 0, 0, 0); // Rootkin Elder
-            c[108] = new Card(109, -1, Location.MyHand, CardType.Creature, 5, 5, 6, Abilities.None, 0, 0, 0); // Elder Engulfer
-            c[109] = new Card(110, -1, Location.MyHand, CardType.Creature, 5, 0, 9, Abilities.Guard, 0, 0, 0); // Gargoyle
-            c[110] = new Card(111, -1, Location.MyHand, CardType.Creature, 6, 6, 6, Abilities.Guard, 0, 0, 0); // Turta Knight
-            c[111] = new Card(112, -1, Location.MyHand, CardType.Creature, 6, 4, 7, Abilities.Guard, 0, 0, 0); // Rootkin Leader
-            c[112] = new Card(113, -1, Location.MyHand, CardType.Creature, 6, 2, 4, Abilities.Guard, 4, 0, 0); // Tamed Bilespitter
-            c[113] = new Card(114, -1, Location.MyHand, CardType.Creature, 7, 7, 7, Abilities.Guard, 0, 0, 0); // Gargantua
-            c[114] = new Card(115, -1, Location.MyHand, CardType.Creature, 8, 5, 5, Abilities.Guard | Abilities.Ward, 0, 0, 0); // Rootkin Warchief
-            c[115] = new Card(116, -1, Location.MyHand, CardType.Creature, 12, 8, 8, Abilities.Breakthrough | Abilities.Charge | Abilities.Drain | Abilities.Guard | Abilities.Lethal | Abilities.Ward, 0, 0, 0); // Emperor Nightmare
-            c[116] = new Card(117, -1, Location.MyHand, CardType.GreenItem, 1, 1, 1, Abilities.Breakthrough, 0, 0, 0); // Protein
-            c[117] = new Card(118, -1, Location.MyHand, CardType.GreenItem, 0, 0, 3, Abilities.None, 0, 0, 0); // Royal Helm
-            c[118] = new Card(119, -1, Location.MyHand, CardType.GreenItem, 1, 1, 2, Abilities.None, 0, 0, 0); // Serrated Shield
-            c[119] = new Card(120, -1, Location.MyHand, CardType.GreenItem, 2, 1, 0, Abilities.Lethal, 0, 0, 0); // Venomfruit
-            c[120] = new Card(121, -1, Location.MyHand, CardType.GreenItem, 2, 0, 3, Abilities.None, 0, 0, 1); // Enchanted Hat
-            c[121] = new Card(122, -1, Location.MyHand, CardType.GreenItem, 2, 1, 3, Abilities.Guard, 0, 0, 0); // Bolstering Bread
-            c[122] = new Card(123, -1, Location.MyHand, CardType.GreenItem, 2, 4, 0, Abilities.None, 0, 0, 0); // Wristguards
-            c[123] = new Card(124, -1, Location.MyHand, CardType.GreenItem, 3, 2, 1, Abilities.Drain, 0, 0, 0); // Blood Grapes
-            c[124] = new Card(125, -1, Location.MyHand, CardType.GreenItem, 3, 1, 4, Abilities.None, 0, 0, 0); // Healthy Veggies
-            c[125] = new Card(126, -1, Location.MyHand, CardType.GreenItem, 3, 2, 3, Abilities.None, 0, 0, 0); // Heavy Shield
-            c[126] = new Card(127, -1, Location.MyHand, CardType.GreenItem, 3, 0, 6, Abilities.None, 0, 0, 0); // Imperial Helm
-            c[127] = new Card(128, -1, Location.MyHand, CardType.GreenItem, 4, 4, 3, Abilities.None, 0, 0, 0); // Enchanted Cloth
-            c[128] = new Card(129, -1, Location.MyHand, CardType.GreenItem, 4, 2, 5, Abilities.None, 0, 0, 0); // Enchanted Leather
-            c[129] = new Card(130, -1, Location.MyHand, CardType.GreenItem, 4, 0, 6, Abilities.None, 4, 0, 0); // Helm of Remedy
-            c[130] = new Card(131, -1, Location.MyHand, CardType.GreenItem, 4, 4, 1, Abilities.None, 0, 0, 0); // Heavy Gauntlet
-            c[131] = new Card(132, -1, Location.MyHand, CardType.GreenItem, 5, 3, 3, Abilities.Breakthrough, 0, 0, 0); // High Protein
-            c[132] = new Card(133, -1, Location.MyHand, CardType.GreenItem, 5, 4, 0, Abilities.Ward, 0, 0, 0); // Pie of Power
-            c[133] = new Card(134, -1, Location.MyHand, CardType.GreenItem, 4, 2, 2, Abilities.None, 0, 0, 1); // Light The Way
-            c[134] = new Card(135, -1, Location.MyHand, CardType.GreenItem, 6, 5, 5, Abilities.None, 0, 0, 0); // Imperial Armour
-            c[135] = new Card(136, -1, Location.MyHand, CardType.GreenItem, 0, 1, 1, Abilities.None, 0, 0, 0); // Buckler
-            c[136] = new Card(137, -1, Location.MyHand, CardType.GreenItem, 2, 0, 0, Abilities.Ward, 0, 0, 0); // Ward
-            c[137] = new Card(138, -1, Location.MyHand, CardType.GreenItem, 2, 0, 0, Abilities.Guard, 0, 0, 1); // Grow Horns
-            c[138] = new Card(139, -1, Location.MyHand, CardType.GreenItem, 4, 0, 0, Abilities.Lethal | Abilities.Ward, 0, 0, 0); // Grow Stingers
-            c[139] = new Card(140, -1, Location.MyHand, CardType.GreenItem, 2, 0, 0, Abilities.Charge, 0, 0, 0); // Grow Wings
-            c[140] = new Card(141, -1, Location.MyHand, CardType.RedItem, 0, -1, -1, Abilities.None, 0, 0, 0); // Throwing Knife
-            c[141] = new Card(142, -1, Location.MyHand, CardType.RedItem, 0, 0, 0, Abilities.Breakthrough | Abilities.Charge | Abilities.Drain | Abilities.Guard | Abilities.Lethal | Abilities.Ward, 0, 0, 0); // Staff of Suppression
-            c[142] = new Card(143, -1, Location.MyHand, CardType.RedItem, 0, 0, 0, Abilities.Guard, 0, 0, 0); // Pierce Armour
-            c[143] = new Card(144, -1, Location.MyHand, CardType.RedItem, 1, 0, -2, Abilities.None, 0, 0, 0); // Rune Axe
-            c[144] = new Card(145, -1, Location.MyHand, CardType.RedItem, 3, -2, -2, Abilities.None, 0, 0, 0); // Cursed Sword
-            c[145] = new Card(146, -1, Location.MyHand, CardType.RedItem, 4, -2, -2, Abilities.None, 0, -2, 0); // Cursed Scimitar
-            c[146] = new Card(147, -1, Location.MyHand, CardType.RedItem, 2, 0, -1, Abilities.None, 0, 0, 1); // Quick Shot
-            c[147] = new Card(148, -1, Location.MyHand, CardType.RedItem, 2, 0, -2, Abilities.Breakthrough | Abilities.Charge | Abilities.Drain | Abilities.Guard | Abilities.Lethal | Abilities.Ward, 0, 0, 0); // Helm Crusher
-            c[148] = new Card(149, -1, Location.MyHand, CardType.RedItem, 3, 0, 0, Abilities.Breakthrough | Abilities.Charge | Abilities.Drain | Abilities.Guard | Abilities.Lethal | Abilities.Ward, 0, 0, 1); // Rootkin Ritual
-            c[149] = new Card(150, -1, Location.MyHand, CardType.RedItem, 2, 0, -3, Abilities.None, 0, 0, 0); // Throwing Axe
-            c[150] = new Card(151, -1, Location.MyHand, CardType.RedItem, 5, 0, -99, Abilities.Breakthrough | Abilities.Charge | Abilities.Drain | Abilities.Guard | Abilities.Lethal | Abilities.Ward, 0, 0, 0); // Decimate
-            c[151] = new Card(152, -1, Location.MyHand, CardType.RedItem, 7, 0, -7, Abilities.None, 0, 0, 1); // Mighty Throwing Axe
-            c[152] = new Card(153, -1, Location.MyHand, CardType.BlueItem, 2, 0, 0, Abilities.None, 5, 0, 0); // Healing Potion
-            c[153] = new Card(154, -1, Location.MyHand, CardType.BlueItem, 2, 0, 0, Abilities.None, 0, -2, 1); // Poison
-            c[154] = new Card(155, -1, Location.MyHand, CardType.BlueItem, 3, 0, -3, Abilities.None, 0, -1, 0); // Scroll of Firebolt
-            c[155] = new Card(156, -1, Location.MyHand, CardType.BlueItem, 3, 0, 0, Abilities.None, 3, -3, 0); // Major Life Steal Potion
-            c[156] = new Card(157, -1, Location.MyHand, CardType.BlueItem, 3, 0, -1, Abilities.None, 1, 0, 1); // Life Sap Drop
-            c[157] = new Card(158, -1, Location.MyHand, CardType.BlueItem, 3, 0, -4, Abilities.None, 0, 0, 0); // Tome of Thunder
-            c[158] = new Card(159, -1, Location.MyHand, CardType.BlueItem, 4, 0, -3, Abilities.None, 3, 0, 0); // Vial of Soul Drain
-            c[159] = new Card(160, -1, Location.MyHand, CardType.BlueItem, 2, 0, 0, Abilities.None, 2, -2, 0); // Minor Life Steal Potion
+            c[0] = new Card(1, -1, Location.MyHand, CardType.Creature, 1, 2, 1, Abilities.None, 1, 0, 0);
+            c[1] = new Card(2, -1, Location.MyHand, CardType.Creature, 1, 1, 2, Abilities.None, 0, -1, 0);
+            c[2] = new Card(3, -1, Location.MyHand, CardType.Creature, 1, 2, 2, Abilities.None, 0, 0, 0);
+            c[3] = new Card(4, -1, Location.MyHand, CardType.Creature, 2, 1, 5, Abilities.None, 0, 0, 0);
+            c[4] = new Card(5, -1, Location.MyHand, CardType.Creature, 2, 4, 1, Abilities.None, 0, 0, 0);
+            c[5] = new Card(6, -1, Location.MyHand, CardType.Creature, 2, 3, 2, Abilities.None, 0, 0, 0);
+            c[6] = new Card(7, -1, Location.MyHand, CardType.Creature, 2, 2, 2, Abilities.Ward, 0, 0, 0);
+            c[7] = new Card(8, -1, Location.MyHand, CardType.Creature, 2, 2, 3, Abilities.None, 0, 0, 0);
+            c[8] = new Card(9, -1, Location.MyHand, CardType.Creature, 3, 3, 4, Abilities.None, 0, 0, 0);
+            c[9] = new Card(10, -1, Location.MyHand, CardType.Creature, 3, 3, 1, Abilities.Drain, 0, 0, 0);
+            c[10] = new Card(11, -1, Location.MyHand, CardType.Creature, 3, 5, 2, Abilities.None, 0, 0, 0);
+            c[11] = new Card(12, -1, Location.MyHand, CardType.Creature, 3, 2, 5, Abilities.None, 0, 0, 0);
+            c[12] = new Card(13, -1, Location.MyHand, CardType.Creature, 4, 5, 3, Abilities.None, 1, -1, 0);
+            c[13] = new Card(14, -1, Location.MyHand, CardType.Creature, 4, 9, 1, Abilities.None, 0, 0, 0);
+            c[14] = new Card(15, -1, Location.MyHand, CardType.Creature, 4, 4, 5, Abilities.None, 0, 0, 0);
+            c[15] = new Card(16, -1, Location.MyHand, CardType.Creature, 4, 6, 2, Abilities.None, 0, 0, 0);
+            c[16] = new Card(17, -1, Location.MyHand, CardType.Creature, 4, 4, 5, Abilities.None, 0, 0, 0);
+            c[17] = new Card(18, -1, Location.MyHand, CardType.Creature, 4, 7, 4, Abilities.None, 0, 0, 0);
+            c[18] = new Card(19, -1, Location.MyHand, CardType.Creature, 5, 5, 6, Abilities.None, 0, 0, 0);
+            c[19] = new Card(20, -1, Location.MyHand, CardType.Creature, 5, 8, 2, Abilities.None, 0, 0, 0);
+            c[20] = new Card(21, -1, Location.MyHand, CardType.Creature, 5, 6, 5, Abilities.None, 0, 0, 0);
+            c[21] = new Card(22, -1, Location.MyHand, CardType.Creature, 6, 7, 5, Abilities.None, 0, 0, 0);
+            c[22] = new Card(23, -1, Location.MyHand, CardType.Creature, 7, 8, 8, Abilities.None, 0, 0, 0);
+            c[23] = new Card(24, -1, Location.MyHand, CardType.Creature, 1, 1, 1, Abilities.None, 0, -1, 0);
+            c[24] = new Card(25, -1, Location.MyHand, CardType.Creature, 2, 3, 1, Abilities.None, -2, -2, 0);
+            c[25] = new Card(26, -1, Location.MyHand, CardType.Creature, 2, 3, 2, Abilities.None, 0, -1, 0);
+            c[26] = new Card(27, -1, Location.MyHand, CardType.Creature, 2, 2, 2, Abilities.None, 2, 0, 0);
+            c[27] = new Card(28, -1, Location.MyHand, CardType.Creature, 2, 1, 2, Abilities.None, 0, 0, 1);
+            c[28] = new Card(29, -1, Location.MyHand, CardType.Creature, 2, 2, 1, Abilities.None, 0, 0, 1);
+            c[29] = new Card(30, -1, Location.MyHand, CardType.Creature, 3, 4, 2, Abilities.None, 0, -2, 0);
+            c[30] = new Card(31, -1, Location.MyHand, CardType.Creature, 3, 3, 1, Abilities.None, 0, -1, 0);
+            c[31] = new Card(32, -1, Location.MyHand, CardType.Creature, 3, 3, 2, Abilities.None, 0, 0, 1);
+            c[32] = new Card(33, -1, Location.MyHand, CardType.Creature, 4, 4, 3, Abilities.None, 0, 0, 1);
+            c[33] = new Card(34, -1, Location.MyHand, CardType.Creature, 5, 3, 5, Abilities.None, 0, 0, 1);
+            c[34] = new Card(35, -1, Location.MyHand, CardType.Creature, 6, 5, 2, Abilities.Breakthrough, 0, 0, 1);
+            c[35] = new Card(36, -1, Location.MyHand, CardType.Creature, 6, 4, 4, Abilities.None, 0, 0, 2);
+            c[36] = new Card(37, -1, Location.MyHand, CardType.Creature, 6, 5, 7, Abilities.None, 0, 0, 1);
+            c[37] = new Card(38, -1, Location.MyHand, CardType.Creature, 1, 1, 3, Abilities.Drain, 0, 0, 0);
+            c[38] = new Card(39, -1, Location.MyHand, CardType.Creature, 1, 2, 1, Abilities.Drain, 0, 0, 0);
+            c[39] = new Card(40, -1, Location.MyHand, CardType.Creature, 3, 2, 3, Abilities.Drain | Abilities.Guard, 0, 0, 0);
+            c[40] = new Card(41, -1, Location.MyHand, CardType.Creature, 3, 2, 2, Abilities.Charge | Abilities.Drain, 0, 0, 0);
+            c[41] = new Card(42, -1, Location.MyHand, CardType.Creature, 4, 4, 2, Abilities.Drain, 0, 0, 0);
+            c[42] = new Card(43, -1, Location.MyHand, CardType.Creature, 6, 5, 5, Abilities.Drain, 0, 0, 0);
+            c[43] = new Card(44, -1, Location.MyHand, CardType.Creature, 6, 3, 7, Abilities.Drain | Abilities.Lethal, 0, 0, 0);
+            c[44] = new Card(45, -1, Location.MyHand, CardType.Creature, 6, 6, 5, Abilities.Breakthrough | Abilities.Drain, -3, 0, 0);
+            c[45] = new Card(46, -1, Location.MyHand, CardType.Creature, 9, 7, 7, Abilities.Drain, 0, 0, 0);
+            c[46] = new Card(47, -1, Location.MyHand, CardType.Creature, 2, 1, 5, Abilities.Drain, 0, 0, 0);
+            c[47] = new Card(48, -1, Location.MyHand, CardType.Creature, 1, 1, 1, Abilities.Lethal, 0, 0, 0);
+            c[48] = new Card(49, -1, Location.MyHand, CardType.Creature, 2, 1, 2, Abilities.Guard | Abilities.Lethal, 0, 0, 0);
+            c[49] = new Card(50, -1, Location.MyHand, CardType.Creature, 3, 3, 2, Abilities.Lethal, 0, 0, 0);
+            c[50] = new Card(51, -1, Location.MyHand, CardType.Creature, 4, 3, 5, Abilities.Lethal, 0, 0, 0);
+            c[51] = new Card(52, -1, Location.MyHand, CardType.Creature, 4, 2, 4, Abilities.Lethal, 0, 0, 0);
+            c[52] = new Card(53, -1, Location.MyHand, CardType.Creature, 4, 1, 1, Abilities.Charge | Abilities.Lethal, 0, 0, 0);
+            c[53] = new Card(54, -1, Location.MyHand, CardType.Creature, 3, 2, 2, Abilities.Lethal, 0, 0, 0);
+            c[54] = new Card(55, -1, Location.MyHand, CardType.Creature, 2, 0, 5, Abilities.Guard, 0, 0, 0);
+            c[55] = new Card(56, -1, Location.MyHand, CardType.Creature, 4, 2, 7, Abilities.None, 0, 0, 0);
+            c[56] = new Card(57, -1, Location.MyHand, CardType.Creature, 4, 1, 8, Abilities.None, 0, 0, 0);
+            c[57] = new Card(58, -1, Location.MyHand, CardType.Creature, 6, 5, 6, Abilities.Breakthrough, 0, 0, 0);
+            c[58] = new Card(59, -1, Location.MyHand, CardType.Creature, 7, 7, 7, Abilities.None, 1, -1, 0);
+            c[59] = new Card(60, -1, Location.MyHand, CardType.Creature, 7, 4, 8, Abilities.None, 0, 0, 0);
+            c[60] = new Card(61, -1, Location.MyHand, CardType.Creature, 9, 10, 10, Abilities.None, 0, 0, 0);
+            c[61] = new Card(62, -1, Location.MyHand, CardType.Creature, 12, 12, 12, Abilities.Breakthrough | Abilities.Guard, 0, 0, 0);
+            c[62] = new Card(63, -1, Location.MyHand, CardType.Creature, 2, 0, 4, Abilities.Guard | Abilities.Ward, 0, 0, 0);
+            c[63] = new Card(64, -1, Location.MyHand, CardType.Creature, 2, 1, 1, Abilities.Guard | Abilities.Ward, 0, 0, 0);
+            c[64] = new Card(65, -1, Location.MyHand, CardType.Creature, 2, 2, 2, Abilities.Ward, 0, 0, 0);
+            c[65] = new Card(66, -1, Location.MyHand, CardType.Creature, 5, 5, 1, Abilities.Ward, 0, 0, 0);
+            c[66] = new Card(67, -1, Location.MyHand, CardType.Creature, 6, 5, 5, Abilities.Ward, 0, -2, 0);
+            c[67] = new Card(68, -1, Location.MyHand, CardType.Creature, 6, 7, 5, Abilities.Ward, 0, 0, 0);
+            c[68] = new Card(69, -1, Location.MyHand, CardType.Creature, 3, 4, 4, Abilities.Breakthrough, 0, 0, 0);
+            c[69] = new Card(70, -1, Location.MyHand, CardType.Creature, 4, 6, 3, Abilities.Breakthrough, 0, 0, 0);
+            c[70] = new Card(71, -1, Location.MyHand, CardType.Creature, 4, 3, 2, Abilities.Breakthrough | Abilities.Charge, 0, 0, 0);
+            c[71] = new Card(72, -1, Location.MyHand, CardType.Creature, 4, 5, 3, Abilities.Breakthrough, 0, 0, 0);
+            c[72] = new Card(73, -1, Location.MyHand, CardType.Creature, 4, 4, 4, Abilities.Breakthrough, 4, 0, 0);
+            c[73] = new Card(74, -1, Location.MyHand, CardType.Creature, 5, 5, 4, Abilities.Breakthrough | Abilities.Guard, 0, 0, 0);
+            c[74] = new Card(75, -1, Location.MyHand, CardType.Creature, 5, 6, 5, Abilities.Breakthrough, 0, 0, 0);
+            c[75] = new Card(76, -1, Location.MyHand, CardType.Creature, 6, 5, 5, Abilities.Breakthrough | Abilities.Drain, 0, 0, 0);
+            c[76] = new Card(77, -1, Location.MyHand, CardType.Creature, 7, 7, 7, Abilities.Breakthrough, 0, 0, 0);
+            c[77] = new Card(78, -1, Location.MyHand, CardType.Creature, 8, 5, 5, Abilities.Breakthrough, 0, -5, 0);
+            c[78] = new Card(79, -1, Location.MyHand, CardType.Creature, 8, 8, 8, Abilities.Breakthrough, 0, 0, 0);
+            c[79] = new Card(80, -1, Location.MyHand, CardType.Creature, 8, 8, 8, Abilities.Breakthrough | Abilities.Guard, 0, 0, 1);
+            c[80] = new Card(81, -1, Location.MyHand, CardType.Creature, 9, 6, 6, Abilities.Breakthrough | Abilities.Charge, 0, 0, 0);
+            c[81] = new Card(82, -1, Location.MyHand, CardType.Creature, 7, 5, 5, Abilities.Breakthrough | Abilities.Drain | Abilities.Ward, 0, 0, 0);
+            c[82] = new Card(83, -1, Location.MyHand, CardType.Creature, 0, 1, 1, Abilities.Charge, 0, 0, 0);
+            c[83] = new Card(84, -1, Location.MyHand, CardType.Creature, 2, 1, 1, Abilities.Charge | Abilities.Drain | Abilities.Ward, 0, 0, 0);
+            c[84] = new Card(85, -1, Location.MyHand, CardType.Creature, 3, 2, 3, Abilities.Charge, 0, 0, 0);
+            c[85] = new Card(86, -1, Location.MyHand, CardType.Creature, 3, 1, 5, Abilities.Charge, 0, 0, 0);
+            c[86] = new Card(87, -1, Location.MyHand, CardType.Creature, 4, 2, 5, Abilities.Charge | Abilities.Guard, 0, 0, 0);
+            c[87] = new Card(88, -1, Location.MyHand, CardType.Creature, 5, 4, 4, Abilities.Charge, 0, 0, 0);
+            c[88] = new Card(89, -1, Location.MyHand, CardType.Creature, 5, 4, 1, Abilities.Charge, 2, 0, 0);
+            c[89] = new Card(90, -1, Location.MyHand, CardType.Creature, 8, 5, 5, Abilities.Charge, 0, 0, 0);
+            c[90] = new Card(91, -1, Location.MyHand, CardType.Creature, 0, 1, 2, Abilities.Guard, 0, 1, 0);
+            c[91] = new Card(92, -1, Location.MyHand, CardType.Creature, 1, 0, 1, Abilities.Guard, 2, 0, 0);
+            c[92] = new Card(93, -1, Location.MyHand, CardType.Creature, 1, 2, 1, Abilities.Guard, 0, 0, 0);
+            c[93] = new Card(94, -1, Location.MyHand, CardType.Creature, 2, 1, 4, Abilities.Guard, 0, 0, 0);
+            c[94] = new Card(95, -1, Location.MyHand, CardType.Creature, 2, 2, 3, Abilities.Guard, 0, 0, 0);
+            c[95] = new Card(96, -1, Location.MyHand, CardType.Creature, 2, 3, 2, Abilities.Guard, 0, 0, 0);
+            c[96] = new Card(97, -1, Location.MyHand, CardType.Creature, 3, 3, 3, Abilities.Guard, 0, 0, 0);
+            c[97] = new Card(98, -1, Location.MyHand, CardType.Creature, 3, 2, 4, Abilities.Guard, 0, 0, 0);
+            c[98] = new Card(99, -1, Location.MyHand, CardType.Creature, 3, 2, 5, Abilities.Guard, 0, 0, 0);
+            c[99] = new Card(100, -1, Location.MyHand, CardType.Creature, 3, 1, 6, Abilities.Guard, 0, 0, 0);
+            c[100] = new Card(101, -1, Location.MyHand, CardType.Creature, 4, 3, 4, Abilities.Guard, 0, 0, 0);
+            c[101] = new Card(102, -1, Location.MyHand, CardType.Creature, 4, 3, 3, Abilities.Guard, 0, -1, 0);
+            c[102] = new Card(103, -1, Location.MyHand, CardType.Creature, 4, 3, 6, Abilities.Guard, 0, 0, 0);
+            c[103] = new Card(104, -1, Location.MyHand, CardType.Creature, 4, 4, 4, Abilities.Guard, 0, 0, 0);
+            c[104] = new Card(105, -1, Location.MyHand, CardType.Creature, 5, 4, 6, Abilities.Guard, 0, 0, 0);
+            c[105] = new Card(106, -1, Location.MyHand, CardType.Creature, 5, 5, 5, Abilities.Guard, 0, 0, 0);
+            c[106] = new Card(107, -1, Location.MyHand, CardType.Creature, 5, 3, 3, Abilities.Guard, 3, 0, 0);
+            c[107] = new Card(108, -1, Location.MyHand, CardType.Creature, 5, 2, 6, Abilities.Guard, 0, 0, 0);
+            c[108] = new Card(109, -1, Location.MyHand, CardType.Creature, 5, 5, 6, Abilities.None, 0, 0, 0);
+            c[109] = new Card(110, -1, Location.MyHand, CardType.Creature, 5, 0, 9, Abilities.Guard, 0, 0, 0);
+            c[110] = new Card(111, -1, Location.MyHand, CardType.Creature, 6, 6, 6, Abilities.Guard, 0, 0, 0);
+            c[111] = new Card(112, -1, Location.MyHand, CardType.Creature, 6, 4, 7, Abilities.Guard, 0, 0, 0);
+            c[112] = new Card(113, -1, Location.MyHand, CardType.Creature, 6, 2, 4, Abilities.Guard, 4, 0, 0);
+            c[113] = new Card(114, -1, Location.MyHand, CardType.Creature, 7, 7, 7, Abilities.Guard, 0, 0, 0);
+            c[114] = new Card(115, -1, Location.MyHand, CardType.Creature, 8, 5, 5, Abilities.Guard | Abilities.Ward, 0, 0, 0);
+            c[115] = new Card(116, -1, Location.MyHand, CardType.Creature, 12, 8, 8, Abilities.Breakthrough | Abilities.Charge | Abilities.Drain | Abilities.Guard | Abilities.Lethal | Abilities.Ward, 0, 0, 0);
+            c[116] = new Card(117, -1, Location.MyHand, CardType.GreenItem, 1, 1, 1, Abilities.Breakthrough, 0, 0, 0);
+            c[117] = new Card(118, -1, Location.MyHand, CardType.GreenItem, 0, 0, 3, Abilities.None, 0, 0, 0);
+            c[118] = new Card(119, -1, Location.MyHand, CardType.GreenItem, 1, 1, 2, Abilities.None, 0, 0, 0);
+            c[119] = new Card(120, -1, Location.MyHand, CardType.GreenItem, 2, 1, 0, Abilities.Lethal, 0, 0, 0);
+            c[120] = new Card(121, -1, Location.MyHand, CardType.GreenItem, 2, 0, 3, Abilities.None, 0, 0, 1);
+            c[121] = new Card(122, -1, Location.MyHand, CardType.GreenItem, 2, 1, 3, Abilities.Guard, 0, 0, 0);
+            c[122] = new Card(123, -1, Location.MyHand, CardType.GreenItem, 2, 4, 0, Abilities.None, 0, 0, 0);
+            c[123] = new Card(124, -1, Location.MyHand, CardType.GreenItem, 3, 2, 1, Abilities.Drain, 0, 0, 0);
+            c[124] = new Card(125, -1, Location.MyHand, CardType.GreenItem, 3, 1, 4, Abilities.None, 0, 0, 0);
+            c[125] = new Card(126, -1, Location.MyHand, CardType.GreenItem, 3, 2, 3, Abilities.None, 0, 0, 0);
+            c[126] = new Card(127, -1, Location.MyHand, CardType.GreenItem, 3, 0, 6, Abilities.None, 0, 0, 0);
+            c[127] = new Card(128, -1, Location.MyHand, CardType.GreenItem, 4, 4, 3, Abilities.None, 0, 0, 0);
+            c[128] = new Card(129, -1, Location.MyHand, CardType.GreenItem, 4, 2, 5, Abilities.None, 0, 0, 0);
+            c[129] = new Card(130, -1, Location.MyHand, CardType.GreenItem, 4, 0, 6, Abilities.None, 4, 0, 0);
+            c[130] = new Card(131, -1, Location.MyHand, CardType.GreenItem, 4, 4, 1, Abilities.None, 0, 0, 0);
+            c[131] = new Card(132, -1, Location.MyHand, CardType.GreenItem, 5, 3, 3, Abilities.Breakthrough, 0, 0, 0);
+            c[132] = new Card(133, -1, Location.MyHand, CardType.GreenItem, 5, 4, 0, Abilities.Ward, 0, 0, 0);
+            c[133] = new Card(134, -1, Location.MyHand, CardType.GreenItem, 4, 2, 2, Abilities.None, 0, 0, 1);
+            c[134] = new Card(135, -1, Location.MyHand, CardType.GreenItem, 6, 5, 5, Abilities.None, 0, 0, 0);
+            c[135] = new Card(136, -1, Location.MyHand, CardType.GreenItem, 0, 1, 1, Abilities.None, 0, 0, 0);
+            c[136] = new Card(137, -1, Location.MyHand, CardType.GreenItem, 2, 0, 0, Abilities.Ward, 0, 0, 0);
+            c[137] = new Card(138, -1, Location.MyHand, CardType.GreenItem, 2, 0, 0, Abilities.Guard, 0, 0, 1);
+            c[138] = new Card(139, -1, Location.MyHand, CardType.GreenItem, 4, 0, 0, Abilities.Lethal | Abilities.Ward, 0, 0, 0);
+            c[139] = new Card(140, -1, Location.MyHand, CardType.GreenItem, 2, 0, 0, Abilities.Charge, 0, 0, 0);
+            c[140] = new Card(141, -1, Location.MyHand, CardType.RedItem, 0, -1, -1, Abilities.None, 0, 0, 0);
+            c[141] = new Card(142, -1, Location.MyHand, CardType.RedItem, 0, 0, 0, Abilities.Breakthrough | Abilities.Charge | Abilities.Drain | Abilities.Guard | Abilities.Lethal | Abilities.Ward, 0, 0, 0);
+            c[142] = new Card(143, -1, Location.MyHand, CardType.RedItem, 0, 0, 0, Abilities.Guard, 0, 0, 0);
+            c[143] = new Card(144, -1, Location.MyHand, CardType.RedItem, 1, 0, -2, Abilities.None, 0, 0, 0);
+            c[144] = new Card(145, -1, Location.MyHand, CardType.RedItem, 3, -2, -2, Abilities.None, 0, 0, 0);
+            c[145] = new Card(146, -1, Location.MyHand, CardType.RedItem, 4, -2, -2, Abilities.None, 0, -2, 0);
+            c[146] = new Card(147, -1, Location.MyHand, CardType.RedItem, 2, 0, -1, Abilities.None, 0, 0, 1);
+            c[147] = new Card(148, -1, Location.MyHand, CardType.RedItem, 2, 0, -2, Abilities.Breakthrough | Abilities.Charge | Abilities.Drain | Abilities.Guard | Abilities.Lethal | Abilities.Ward, 0, 0, 0);
+            c[148] = new Card(149, -1, Location.MyHand, CardType.RedItem, 3, 0, 0, Abilities.Breakthrough | Abilities.Charge | Abilities.Drain | Abilities.Guard | Abilities.Lethal | Abilities.Ward, 0, 0, 1);
+            c[149] = new Card(150, -1, Location.MyHand, CardType.RedItem, 2, 0, -3, Abilities.None, 0, 0, 0);
+            c[150] = new Card(151, -1, Location.MyHand, CardType.RedItem, 5, 0, -99, Abilities.Breakthrough | Abilities.Charge | Abilities.Drain | Abilities.Guard | Abilities.Lethal | Abilities.Ward, 0, 0, 0);
+            c[151] = new Card(152, -1, Location.MyHand, CardType.RedItem, 7, 0, -7, Abilities.None, 0, 0, 1);
+            c[152] = new Card(153, -1, Location.MyHand, CardType.BlueItem, 2, 0, 0, Abilities.None, 5, 0, 0);
+            c[153] = new Card(154, -1, Location.MyHand, CardType.BlueItem, 2, 0, 0, Abilities.None, 0, -2, 1);
+            c[154] = new Card(155, -1, Location.MyHand, CardType.BlueItem, 3, 0, -3, Abilities.None, 0, -1, 0);
+            c[155] = new Card(156, -1, Location.MyHand, CardType.BlueItem, 3, 0, 0, Abilities.None, 3, -3, 0);
+            c[156] = new Card(157, -1, Location.MyHand, CardType.BlueItem, 3, 0, -1, Abilities.None, 1, 0, 1);
+            c[157] = new Card(158, -1, Location.MyHand, CardType.BlueItem, 3, 0, -4, Abilities.None, 0, 0, 0);
+            c[158] = new Card(159, -1, Location.MyHand, CardType.BlueItem, 4, 0, -3, Abilities.None, 3, 0, 0);
+            c[159] = new Card(160, -1, Location.MyHand, CardType.BlueItem, 2, 0, 0, Abilities.None, 2, -2, 0);
             return c;
         }
 
@@ -1081,8 +1081,8 @@ namespace Locm
         public int Health;
         public int Mana;
         public int DeckSize;
-        public int Rune;      // следующая руна (25/20/15/10/5) или 0
-        public int Draw;      // сколько карт игрок доберёт в начале следующего хода
+        public int Rune;
+        public int Draw;
 
         public override string ToString() => $"hp={Health} mana={Mana} deck={DeckSize} rune={Rune} draw={Draw}";
     }
@@ -1144,7 +1144,7 @@ namespace Locm
         public int Defense;
         public Abilities Abilities;
         public bool CanAttack;
-        public bool HasAttacked;   // атаковало в текущем ходу (для Charge через предмет)
+        public bool HasAttacked;
         public int MyHealthChange;
         public int OpponentHealthChange;
         public int CardDraw;
@@ -1218,8 +1218,8 @@ namespace Locm
     public readonly struct GameAction : IEquatable<GameAction>
     {
         public readonly ActionType Type;
-        public readonly int Id;       // instanceId карты/существа
-        public readonly int Target;   // instanceId цели или -1 (лицо игрока); для SUMMON не используется
+        public readonly int Id;
+        public readonly int Target;
 
         public const int Face = -1;
 
@@ -1358,11 +1358,11 @@ namespace Locm
             s.Winner = -1;
 
             me.Health = input.Me.Health;
-            me.MaxMana = input.Me.Mana;      // арбитр присылает maxMana; в начале хода currentMana == maxMana
+            me.MaxMana = input.Me.Mana;
             me.Mana = input.Me.Mana;
             me.DeckSize = input.Me.DeckSize;
             me.NextRune = input.Me.Rune;
-            me.DrawShown = input.Me.Draw;    // сколько карт я добрал в начале этого хода
+            me.DrawShown = input.Me.Draw;
             me.NextTurnDraw = 1;
 
             opp.Health = input.Opponent.Health;
@@ -1371,7 +1371,7 @@ namespace Locm
             opp.DeckSize = input.Opponent.DeckSize;
             opp.NextRune = input.Opponent.Rune;
             opp.DrawShown = input.Opponent.Draw;
-            opp.NextTurnDraw = input.Opponent.Draw;   // столько противник доберёт (плюс руны, которые я пробью)
+            opp.NextTurnDraw = input.Opponent.Draw;
             opp.HandCount = input.OpponentHandSize;
 
             foreach (var c in input.Cards)
@@ -1389,7 +1389,6 @@ namespace Locm
             s.CheckWinCondition();
             return s;
         }
-
 
         public ulong Hash()
         {
@@ -1436,7 +1435,6 @@ namespace Locm
             s.CopyFrom(this);
             return s;
         }
-
 
         public void LegalActions(List<GameAction> into)
         {
@@ -1531,7 +1529,6 @@ namespace Locm
             }
             return false;
         }
-
 
         public bool TryApply(GameAction a)
         {
@@ -1694,7 +1691,7 @@ namespace Locm
             t.Attack = Math.Max(0, t.Attack + item.Attack);
 
             if (t.Has(Abilities.Ward) && item.Defense < 0)
-                t.Abilities &= ~Abilities.Ward;      // Ward поглощает урон предмета целиком
+                t.Abilities &= ~Abilities.Ward;
             else
                 t.Defense += item.Defense;
 
@@ -1708,10 +1705,9 @@ namespace Locm
 
         public void CheckWinCondition()
         {
-            if (Opp.Health <= 0) Winner = Current;           // сначала честная победа
-            else if (Me.Health <= 0) Winner = 1 - Current;   // потом самоубийство
+            if (Opp.Health <= 0) Winner = Current;
+            else if (Me.Health <= 0) Winner = 1 - Current;
         }
-
 
         public void EndTurn()
         {
@@ -1748,7 +1744,6 @@ namespace Locm
             p.NextTurnDraw = 1;
             CheckWinCondition();
         }
-
 
         public string[] ToInputLines()
         {
@@ -1790,15 +1785,15 @@ namespace Locm
     {
         public int Health;
         public int MaxMana;
-        public int Mana;              // текущая мана (currentMana)
+        public int Mana;
         public int DeckSize;
-        public int NextRune;          // следующая руна: 25/20/15/10/5, 0 — рун нет
-        public int NextTurnDraw;      // сколько карт доберёт в начале своего следующего хода
-        public int DrawShown;         // поле draw из ввода (drawValueToShow арбитра)
-        public int BonusManaTurns;    // бонус маны второго игрока: 1 — ещё действует, 0 — нет
+        public int NextRune;
+        public int NextTurnDraw;
+        public int DrawShown;
+        public int BonusManaTurns;
 
-        public int HandCount;         // всего карт в руке, включая неизвестные
-        public int HandKnown;         // известные карты: Hand[0..HandKnown)
+        public int HandCount;
+        public int HandKnown;
         public readonly Card[] Hand = new Card[GameState.MaxHand];
 
         public int BoardCount;
