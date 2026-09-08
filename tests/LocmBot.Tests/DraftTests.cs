@@ -46,11 +46,26 @@ namespace Locm.Tests
         public static void ManaCurve_ShiftsPickTowardsMissingCosts()
         {
             var d = FormulaDraft();
+            double savedW = RatingDraft.CurveW;
+            double[] savedCurve = RatingDraft.TargetCurve;
+            RatingDraft.CurveW = 0.6;
+            RatingDraft.TargetCurve = new double[] { 0, 4, 7, 6, 5, 4, 2, 2 };
+            try
+            {
             var picked = new List<Card>();
             var triple = Triple(7, 19, 19);   // Rootkin Sapling 2/2 W (2) против Foulbeast 5/6 (5)
-            Assert.Equal(0, d.Pick(triple, picked), "empty deck: cheap ward creature first");
+            Assert.Equal(1, d.Pick(triple, picked), "empty deck: no curve pressure yet, higher-rated Foulbeast");
+            for (int i = 0; i < 7; i++) picked.Add(CardDb.Get(19)); // семь 5-дропов
+            Assert.Equal(0, d.Pick(triple, picked), "curve full of 5-drops: take the 2-drop");
+            picked.Clear();
             for (int i = 0; i < 7; i++) picked.Add(CardDb.Get(6)); // семь 2-дропов
             Assert.Equal(1, d.Pick(triple, picked), "curve full of 2-drops: take the 5-drop");
+            }
+            finally
+            {
+                RatingDraft.CurveW = savedW;
+                RatingDraft.TargetCurve = savedCurve;
+            }
         }
 
         [Test]
@@ -60,7 +75,7 @@ namespace Locm.Tests
             var picked = new List<Card>();
             var triple = Triple(151, 9, 9);   // Decimate против Corrupted Beavrat 3/4
             Assert.Equal(0, d.Pick(triple, picked));
-            for (int i = 0; i < d.MaxItems; i++) picked.Add(CardDb.Get(144));
+            for (int i = 0; i < RatingDraft.MaxItems; i++) picked.Add(CardDb.Get(144));
             Assert.Equal(1, d.Pick(triple, picked));
         }
 

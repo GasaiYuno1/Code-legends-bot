@@ -10,6 +10,19 @@ namespace Locm.Tests
         {
             if (args.Length > 0 && args[0] == "replay")
                 return ReplayMain(args);
+            if (args.Length > 0 && args[0] == "draftcheck")
+            {
+                var paths = new System.Collections.Generic.List<string>();
+                var overrides = new System.Collections.Generic.List<string>();
+                bool verbose = false;
+                for (int i = 1; i < args.Length; i++)
+                {
+                    if (args[i] == "-v") verbose = true;
+                    else if (args[i].Contains("=")) overrides.Add(args[i]);
+                    else paths.Add(args[i]);
+                }
+                return DraftCheck.Run(paths.ToArray(), verbose, overrides.ToArray());
+            }
             if (args.Length > 0 && args[0] == "compare")
             {
                 // compare <файлы|каталоги> [мс на поиск] [limit=N] [step=K] [key=value ...]

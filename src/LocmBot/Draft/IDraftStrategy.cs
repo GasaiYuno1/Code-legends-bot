@@ -21,13 +21,14 @@ namespace Locm
     /// </summary>
     public sealed class RatingDraft : IDraftStrategy
     {
-        /// <summary>Желаемое число карт по стоимости 0..7+ в колоде из 30.</summary>
-        public readonly int[] TargetCurve = { 0, 4, 7, 6, 5, 4, 2, 2 };
-        public double CurveW = 0.6;          // бонус/штраф за карту недобора/перебора
-        public int MaxItems = 8;
-        public double ItemOverPenalty = 3.0;
-        public int MaxSameCard = 2;          // третья копия одной карты — штраф
-        public double SameCardPenalty = 1.5;
+        /// <summary>Желаемое число карт по стоимости 0..7+ в колоде из 30 (по средней колоде Legend: 0.6 1.6 6.4 5.3 5.8 3.5 3.0 3.6).</summary>
+        public static double[] TargetCurve = { 0.6, 1.6, 6.4, 5.3, 5.8, 3.5, 3.0, 3.6 };
+        // Совпадение с пиками Legend (88k пиков): 0 → 86.5%, 0.1 → 86.4%, 0.6 → 75.7%. Малая поправка почти бесплатна и страхует от колод из одних 6+.
+        public static double CurveW = 0.1;
+        public static int MaxItems = 8;
+        public static double ItemOverPenalty = 3.0;
+        public static int MaxSameCard = 2;          // третья копия одной карты — штраф
+        public static double SameCardPenalty = 0.0; // Legend третью копию не избегает: со штрафом 1.5 совпадение с их пиками падает на 2%
 
         private readonly int[] _curve = new int[8];
 
@@ -59,7 +60,9 @@ namespace Locm
         {
             double s = CardRating.Rate(c);
             int b = Bucket(c.Cost);
-            s += (TargetCurve[b] - _curve[b]) * CurveW;
+            // недобор считается относительно прогресса драфта: на k-м пике ожидаем Target*k/30 карт в корзине
+            double expected = TargetCurve[b] * alreadyPicked.Count / 30.0;
+            s += (expected - _curve[b]) * CurveW;
             if (c.IsItem && items >= MaxItems) s -= ItemOverPenalty;
             int copies = 0;
             foreach (var p in alreadyPicked) if (p.Number == c.Number) copies++;

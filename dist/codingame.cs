@@ -878,12 +878,12 @@ namespace Locm
 
     public sealed class RatingDraft : IDraftStrategy
     {
-        public readonly int[] TargetCurve = { 0, 4, 7, 6, 5, 4, 2, 2 };
-        public double CurveW = 0.6;
-        public int MaxItems = 8;
-        public double ItemOverPenalty = 3.0;
-        public int MaxSameCard = 2;
-        public double SameCardPenalty = 1.5;
+        public static double[] TargetCurve = { 0.6, 1.6, 6.4, 5.3, 5.8, 3.5, 3.0, 3.6 };
+        public static double CurveW = 0.1;
+        public static int MaxItems = 8;
+        public static double ItemOverPenalty = 3.0;
+        public static int MaxSameCard = 2;
+        public static double SameCardPenalty = 0.0;
 
         private readonly int[] _curve = new int[8];
 
@@ -915,7 +915,8 @@ namespace Locm
         {
             double s = CardRating.Rate(c);
             int b = Bucket(c.Cost);
-            s += (TargetCurve[b] - _curve[b]) * CurveW;
+            double expected = TargetCurve[b] * alreadyPicked.Count / 30.0;
+            s += (expected - _curve[b]) * CurveW;
             if (c.IsItem && items >= MaxItems) s -= ItemOverPenalty;
             int copies = 0;
             foreach (var p in alreadyPicked) if (p.Number == c.Number) copies++;
@@ -2342,6 +2343,18 @@ namespace Locm
                 int eq = arg.IndexOf('=');
                 if (eq <= 0) continue;
                 string key = arg.Substring(0, eq).ToLowerInvariant();
+                if (key == "curve")
+                {
+                    var parts = arg.Substring(eq + 1).Split(',');
+                    if (parts.Length == 8)
+                    {
+                        var curve = new double[8];
+                        bool ok = true;
+                        for (int i = 0; i < 8; i++) ok &= double.TryParse(parts[i], NumberStyles.Float, CultureInfo.InvariantCulture, out curve[i]);
+                        if (ok) RatingDraft.TargetCurve = curve;
+                    }
+                    continue;
+                }
                 double v;
                 if (!double.TryParse(arg.Substring(eq + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out v)) continue;
                 switch (key)
@@ -2364,6 +2377,10 @@ namespace Locm
                     case "reply": search.ReplyWeight = v; break;
                     case "cand": search.MaxCandidates = (int)v; break;
                     case "table": CardRating.UseTable = v != 0; break;
+                    case "curvew": RatingDraft.CurveW = v; break;
+                    case "maxitems": RatingDraft.MaxItems = (int)v; break;
+                    case "itempenalty": RatingDraft.ItemOverPenalty = v; break;
+                    case "samecard": RatingDraft.SameCardPenalty = v; break;
                     default:
                         if (log != null) log.WriteLine("unknown override: " + arg);
                         continue;

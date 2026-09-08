@@ -14,6 +14,7 @@
     (пустая строка)
 
 Запуск: python3 tools/arena/fetch.py [--league 6] [--agents 30] [--max-games 300] [--out data/arena/games.txt]
+        python3 tools/arena/fetch.py --handle <publicHandle из URL профиля> --out build/user/games.txt   # бои одного игрока
 Повторный запуск дописывает только новые партии. Лиги: 6 Legend, 5 Gold, 4 Silver, 3 Bronze.
 """
 import argparse
@@ -75,6 +76,8 @@ def extract(game, leagues):
         if k not in seeds:
             return None
     agents = sorted(game["agents"], key=lambda a: a["index"])
+    for a in agents:
+        a["agentId"] = a.get("agentId", -1)
     if len(agents) != 2:
         return None
     scores = game.get("scores") or []
@@ -105,7 +108,8 @@ def extract(game, leagues):
         "gameId": game["gameId"],
         "winner": winner,
         "agents": [a["agentId"] for a in agents],
-        "names": [a["codingamer"]["pseudo"].replace(" ", "_") for a in agents],
+        # у Босса лиги нет профиля codingamer
+        "names": [((a.get("codingamer") or {}).get("pseudo") or "Boss").replace(" ", "_") for a in agents],
         "leagues": [leagues.get(a["agentId"], -1) for a in agents],
         "seeds": seeds,
         "picks": picks,
@@ -142,6 +146,7 @@ def main():
     ap.add_argument("--max-games", type=int, default=300)
     ap.add_argument("--out", default="data/arena/games.txt")
     ap.add_argument("--delay", type=float, default=0.15)
+    ap.add_argument("--handle", default=None, help="публичный handle игрока (из URL профиля): скачать его последние бои вместо топа лиги")
     args = ap.parse_args()
 
     out = Path(args.out)
@@ -150,8 +155,16 @@ def main():
 
     users = leaderboard()
     leagues = {u["agentId"]: u["league"]["divisionIndex"] for u in users}
-    picked = [u for u in users if u["league"]["divisionIndex"] == args.league][: args.agents]
-    print(f"leaderboard: {len(users)} users, league {args.league}: {sum(1 for u in users if u['league']['divisionIndex'] == args.league)}, using {len(picked)} agents", file=sys.stderr)
+    if args.handle:
+        picked = [u for u in users if (u.get("codingamer") or {}).get("publicHandle") == args.handle]
+        if not picked:
+            print("handle not found in the top-1000 leaderboard", file=sys.stderr)
+            return
+        u = picked[0]
+        print(f"{u['pseudo']}: rank {u['rank']}, league {u['league']['divisionIndex']} #{u['localRank']}, agent {u['agentId']}", file=sys.stderr)
+    else:
+        picked = [u for u in users if u["league"]["divisionIndex"] == args.league][: args.agents]
+        print(f"leaderboard: {len(users)} users, league {args.league}: {sum(1 for u in users if u['league']['divisionIndex'] == args.league)}, using {len(picked)} agents", file=sys.stderr)
 
     game_ids = []
     seen = set(have)
