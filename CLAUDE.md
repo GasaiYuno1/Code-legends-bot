@@ -8,36 +8,41 @@
 - Язык **C#** (.NET 8, LangVersion 10 — без новых фич, чтобы точно собиралось на CodinGame). Порт ядра на C++ — только если упрёмся в 100 мс.
 - Бой: **симулятор правил + полный перебор своего хода** с отсечениями и эвристической оценкой (без стадии «эвристический бот»).
 - Драфт: статический рейтинг карт + поправка на мана-кривую; позже статистика из self-play.
-- Правила брать из кода официального арбитра: https://github.com/CodinGame/LegendsOfCodeAndMagic (Java). Подробный конспект правил и варианты: `docs/01-rules-and-options.md`.
+- Правила брать из кода официального арбитра: https://github.com/CodinGame/LegendsOfCodeAndMagic (Java, классы `engine/GameState.java`, `Gamer.java`). Симулятор — построчная копия этой логики; при сомнениях смотреть Java, а не конспект. Конспект правил и варианты: `docs/01-rules-and-options.md`.
 
 ## Структура
-- `src/LocmBot/` — бот. Блочные `namespace Locm { }`, все `using` в начале файла (этого требует склейка).
-  - `Game/` — модель ввода: `Abilities` (flags), `Card`, `TurnInput`, `InputParser`.
-  - `Draft/IDraftStrategy.cs` — `FirstCardDraft` (заглушка).
-  - `Battle/IBattleStrategy.cs` — `PassBattle` (заглушка).
-  - `Bot.cs` — оркестратор (фаза по счётчику ходов + `LooksLikeDraft`), `TurnClock.cs` — тайминг.
-- `tests/LocmBot.Tests/` — тесты **без NuGet** (свой мини-раннер `MiniTest.cs`, атрибут `[Test]` на `public static void`).
-- `tools/bundle.py` — склейка в один файл `build/codingame.cs` для вставки на CodinGame.
-- `referee/cardlist.txt` — все 160 карт (формат `baseId ; name ; type ; cost ; atk ; def ; abilities ; myHp ; oppHp ; draw ; text`).
+- `src/LocmBot/` — бот. Блочные `namespace Locm { }`, все `using` в начале файла (этого требует склейка). Внешних пакетов нет.
+  - `Game/` — модель ввода: `Abilities` (flags), `Card` (readonly struct — карта как в строке ввода), `TurnInput`, `InputParser`, `CardDb` (все 160 карт; **генерируется** `tools/gen_carddb.py`, руками не править).
+  - `Sim/` — симулятор правил (этап 1): `GameAction` (SUMMON/ATTACK/USE/PASS, парсинг и формат арбитра), `Creature` (существо на столе), `PlayerState` (здоровье, мана, руны, добор, рука/стол), `GameState` (`FromInput`, `LegalActions`/`IsLegal`, `Apply`/`TryApply`/`ApplySequence`, `EndTurn`, `ToInputLines`, `Clone`/`CopyFrom`). Рука противника и колоды — только счётчики (`HandCount` против известных `HandKnown`); `Players[0]` — я, `Current` — чей ход.
+  - `Draft/IDraftStrategy.cs` — `FirstCardDraft` (заглушка). `Battle/IBattleStrategy.cs` — `PassBattle` (заглушка).
+  - `Bot.cs` — оркестратор (фаза по счётчику ходов + `LooksLikeDraft`); необязательный `dump` пишет ввод и ответ каждого хода в формате логов сверки (включается константой `DumpInput` в `Program.cs`). `TurnClock.cs` — тайминг.
+- `tests/LocmBot.Tests/` — тесты **без NuGet** (свой мини-раннер `MiniTest.cs`, атрибут `[Test]` на `public static void`). `SimTests` — граничные случаи правил; `Replay.cs` — сверка симулятора с логами арбитра; `tests/fixtures/*.log` — логи случайных партий, сыгранных настоящим движком арбитра (тест `FixturesMatchReferee` требует 0 расхождений и ≥ 200 ходов).
+- `tools/bundle.py` — склейка в один файл `build/codingame.cs` для вставки на CodinGame. `tools/gen_carddb.py` — генерация `CardDb.cs`. `tools/refcheck/` — Java-обвязка над классами движка арбитра (без SDK, со стабами): случайные партии с подмешанными нелегальными действиями → логи для `replay`.
+- `referee/cardlist.txt` — все 160 карт (формат `baseId ; name ; type ; cost ; atk ; def ; abilities ; myHp ; oppHp ; draw ; text`), совпадает с арбитром.
 - `nuget.config` очищает источники пакетов (проект должен собираться без сети). Внешние пакеты не добавлять.
 
 ## Команды
 ```
 dotnet build src/LocmBot -c Release
-dotnet run --project tests/LocmBot.Tests          # все тесты; аргумент = фильтр по имени
-python3 tools/bundle.py                            # -> build/codingame.cs
+dotnet run --project tests/LocmBot.Tests                                  # все тесты; аргумент = фильтр по имени
+dotnet run --project tests/LocmBot.Tests -- replay <файлы|каталог>       # сверка симулятора с логами арбитра
+tools/refcheck/run.sh <клон LegendsOfCodeAndMagic> [seed] [игр] [каталог] # новые логи движком арбитра (Java 17+)
+python3 tools/gen_carddb.py                                              # referee/cardlist.txt -> Game/CardDb.cs
+python3 tools/bundle.py                                                  # -> build/codingame.cs
 ```
+Формат лога сверки: блоки «ввод арбитра как есть» + строка `> ответ бота`; строки с `#` и пустые игнорируются; ходы драфта пропускаются.
 
 ## Ключевые факты правил (см. docs для полного)
-- 30 HP, рука ≤ 8, стол ≤ 6, мана ≤ 12; 2-й игрок: 5 стартовых карт и +1 макс. маны, пока впервые не потратит всю ману.
-- Способности B/C/D/G/L/W; предметы: зелёный — свои существа, красный — чужие, синий — чужие или лицо (-1).
-- Руны 25/20/15/10/5: пробитие руны = +1 добор противнику; добор из пустой колоды = HP падает до следующей руны.
-- Время: 1000 мс на первый ход драфта и первый ход боя, 100 мс на остальные. Ответ — одна строка, действия через `;`. Нелегальные действия — только warning.
-- Ввод: 2 строки игроков (`hp mana deck rune draw`), `oppHand oppActions`, строки действий противника, `cardCount`, карты (`number instanceId location type cost atk def abilities myHp oppHp draw`).
+- 30 HP, рука ≤ 8, стол ≤ 6, мана ≤ 12; 2-й игрок: 5 стартовых карт, `maxMana` с 1 (на первом ходу 2 маны) и +1 к максимуму, пока впервые не потратит всю ману.
+- Способности B/C/D/G/L/W; предметы: зелёный — свои существа, красный — чужие, синий — чужие или лицо (-1). Синий в лицо бьёт полем `defense` (+ `oppHealthChange`). Порядок предмета: ключевые слова → attack (не ниже 0) → defense; Ward поглощает урон предмета целиком.
+- Руны 25/20/15/10/5: пробитие руны = +1 добор противнику (лечение руны не возвращает). Добор из пустой колоды или с 50-го хода игрока: за **каждую** недобранную карту минус руна, HP = её значение, без бонусного добора; проверка колоды идёт раньше проверки полной руки.
+- Время: 1000 мс на первый ход драфта и первый ход боя, 100 мс на остальные. Ответ — одна строка, действия через `;`. Нелегальные действия — только warning; `PASS` внутри строки просто пропускается; синтаксически кривое действие (в т.ч. двойной пробел) = поражение.
+- Ввод: 2 строки игроков (`hp mana deck rune draw`), `oppHand oppActions`, строки действий противника, `cardCount`, карты (`number instanceId location type cost atk def abilities myHp oppHp draw`). `mana` = maxMana; `draw` у меня — сколько добрал в этот ход, у противника — сколько доберёт в следующий. instanceId нечётные у первого игрока, чётные у второго (`GameState.IsSecondPlayer`).
+- Причуда арбитра: у существа на столе поля myHp/oppHp/draw во вводе обнуляются после первого боя или предмета; зелёный предмет «не убивает» (существо остаётся как было).
 
 ## План этапов
 0. ✅ Каркас: парсер, модель, заглушки, тесты, склейка.
-1. Симулятор правил (`GameState`, применение действий, генерация легальных ходов) + тесты на граничные случаи (Ward+Lethal, Breakthrough vs Ward, Charge через предмет, руны, переполнение руки). Сверка с логами реальных игр.
+1. ✅ Симулятор правил (`GameState`, применение действий, генерация легальных ходов) + тесты граничных случаев; сверка с движком арбитра: 62 случайные партии, ~4000 ходов, 0 расхождений (в репозитории фикстуры на ~760 ходов). По желанию: прогнать логи реальных игр с CodinGame (`DumpInput` → `replay`).
 2. Драфт по рейтингу + мана-кривая; бой — перебор с простой оценкой. Цель: Gold.
 3. Отсечения (порядок атак, хеширование состояний), оценка с рунами, модель ответа противника. Цель: Legend.
 4. Локальный арбитр (Java/Maven) + self-play; тюнинг весов.
