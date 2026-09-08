@@ -121,6 +121,9 @@ def main():
     ap.add_argument("--bot-b", default=None, help="LocmBot.dll для стороны B в --vs (по умолчанию тот же, что --bot)")
     ap.add_argument("--classes", default=str(CLASSES), help="каталог классов BotMatch")
     ap.add_argument("--out", default=str(OUT), help="каталог журнала/состояния")
+    ap.add_argument("--pool", nargs="*", default=None,
+                    help="лига: аргументы key=value соперников (эталонная сборка + аргументы; '' = чистый эталон); "
+                         "θ+ и θ− играют с каждым по --games партий на одних сидах, градиент = разность винрейтов")
     args = ap.parse_args()
     CLASSES = Path(args.classes)
     OUT = Path(args.out)
@@ -152,22 +155,46 @@ def main():
         it, best = 0, {"score": 0.5, "theta": dict(theta), "iter": 0}
         log(f"start: {fmt(theta)}")
 
+    pool = args.pool
+    if pool is not None:
+        log(f"league pool: {pool}")
+
+    def league(th, seed, games):
+        """Суммарный винрейт θ против всех соперников пула на одних сидах."""
+        tw = tn = 0
+        for m in pool:
+            w, n = match(games, seed, cmd(th), (cmd(None) + " " + m).strip(), args.workers)
+            tw += w
+            tn += n
+        return tw, tn
+
     while it < args.iters:
         delta = {k: rng.choice((-1.0, 1.0)) for k in PARAMS}
         plus = clip({k: theta[k] + args.cscale * PARAMS[k][1] * delta[k] for k in PARAMS})
         minus = clip({k: theta[k] - args.cscale * PARAMS[k][1] * delta[k] for k in PARAMS})
         t0 = time.time()
-        w, n = match(args.games, args.seed * 100000 + it, cmd(plus), cmd(minus), args.workers)
-        wr = w / n
+        if pool is None:
+            w, n = match(args.games, args.seed * 100000 + it, cmd(plus), cmd(minus), args.workers)
+            wr = w / n
+            g = 2 * wr - 1
+            detail = f"plus {w}/{n} = {100 * wr:.1f}%"
+        else:
+            wp, n = league(plus, args.seed * 100000 + it, args.games)
+            wm, _ = league(minus, args.seed * 100000 + it, args.games)
+            g = (wp - wm) / n
+            detail = f"plus {wp}/{n} minus {wm}/{n} (diff {100 * g:+.1f}%)"
         k_decay = args.decay / (it + args.decay)
         for k in PARAMS:
-            theta[k] += args.lr * k_decay * (2 * wr - 1) * delta[k] * PARAMS[k][1]
+            theta[k] += args.lr * k_decay * g * delta[k] * PARAMS[k][1]
         clip(theta)
         it += 1
-        log(f"iter {it}: plus {w}/{n} = {100 * wr:.1f}% ({time.time() - t0:.0f} s)  -> {fmt(theta)}")
+        log(f"iter {it}: {detail} ({time.time() - t0:.0f} s)  -> {fmt(theta)}")
         if it % args.eval_every == 0:
             t0 = time.time()
-            w, n = match(args.eval_games, args.seed * 100000 + 50000 + it, cmd(theta), cmd(None), args.workers)
+            if pool is None:
+                w, n = match(args.eval_games, args.seed * 100000 + 50000 + it, cmd(theta), cmd(None), args.workers)
+            else:
+                w, n = league(theta, args.seed * 100000 + 50000 + it, args.eval_games)
             score = w / n
             log(f"  eval vs reference: {w}/{n} = {100 * score:.1f}% ({time.time() - t0:.0f} s)")
             if score > best["score"]:
