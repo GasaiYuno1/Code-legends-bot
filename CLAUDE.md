@@ -49,3 +49,11 @@ python3 tools/paste_page.py                                              # -> bu
 2. ✅ Драфт по рейтингу + мана-кривая; бой — полный перебор своего хода с простой оценкой. Локально: против random 10:0, self-play без таймаутов (полный перебор укладывается в ~35 мс, бюджет 85 мс), 0 нелегальных действий. Цель Gold — проверить на CodinGame (склейка `dist/codingame.cs`).
 3. Модель ответа противника ✅ (жадные атаки; self-play против версии без неё 19:11). Эксперименты с весами hp/def/reply на 30 партиях — 50/50, веса не решают. Дальше: учёт карт руки противника в ответе (призыв «среднего» существа, removal), отсечения для больших позиций, оценка с рунами, D3-рейтинг драфта по self-play. Цель: Legend.
 4. Локальный арбитр (Java/Maven) + self-play; тюнинг весов.
+
+## Следующий шаг: партии с арены CodinGame (данные сильных ботов вместо self-play)
+Нужен доступ к `www.codingame.com` (сетевая политика окружения: Network access = Custom, домены `www.codingame.com` и `*.codingame.com`; действует только для новых сессий). Затем `tools/arena/`: скрапер на Python без зависимостей.
+Внутренний API (по чужим скраперам, проверить при первом запуске; все запросы — POST с JSON-массивом в теле):
+- `https://www.codingame.com/services/Leaderboards/getFilteredPuzzleLeaderboard` тело `["legends-of-code-and-magic", null, "global", {"active": false, "column": "", "filter": ""}]` → игроки с `agentId` и лигой;
+- `https://www.codingame.com/services/gamesPlayersRanking/findLastBattlesByAgentId` тело `[agentId, null]` → последние бои (`gameId`, игроки);
+- `https://www.codingame.com/services/gameResult/findByGameId` тело `[gameId, null]` → кадры: `gameInformation` (тексты арбитра: «Player X chose …» на драфте, «performed action: …» в бою, «[Warning] … not legal»), `view` (данные просмотрщика с картами).
+Цели: (1) таблица по картам — частота пика и винрейт колод с картой по лигам → рейтинг драфта D3 вместо формулы; (2) сравнение реальных ходов противников с `SearchBattle.ReplyScore`; (3) логи для `replay`.
