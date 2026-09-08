@@ -1,0 +1,14 @@
+namespace Locm
+{
+    public interface IBattleStrategy
+    {
+        /// <summary>Возвращает строку действий хода в формате арбитра ("SUMMON 5;ATTACK 5 -1").</summary>
+        string PlayTurn(TurnInput input, TurnClock clock);
+    }
+
+    /// <summary>Заглушка этапа 0: ничего не делает.</summary>
+    public sealed class PassBattle : IBattleStrategy
+    {
+        public string PlayTurn(TurnInput input, TurnClock clock) => "PASS";
+    }
+}

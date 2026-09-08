@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Тесты без внешних пакетов (xunit/nunit недоступны в песочнице разработки):
+    обычное консольное приложение с минимальным раннером в MiniTest.cs.
+    Запуск: dotnet run - -project tests/LocmBot.Tests
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>10</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <RootNamespace>Locm.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/LocmBot/LocmBot.csproj" />
+  </ItemGroup>
+
+</Project>
