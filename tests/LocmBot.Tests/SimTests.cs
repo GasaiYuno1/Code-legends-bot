@@ -824,3 +824,43 @@ namespace Locm.Tests
         }
     }
 }
+
+namespace Locm.Tests
+{
+    public static class HashTests
+    {
+        [Test]
+        public static void SameStateSameHash_BoardOrderIgnored()
+        {
+            var a = TestUtil.NewState();
+            var b = TestUtil.NewState();
+            TestUtil.Board(a, 0, TestUtil.Cr(1, 2, 2));
+            TestUtil.Board(a, 0, TestUtil.Cr(2, 3, 3));
+            TestUtil.Board(b, 0, TestUtil.Cr(2, 3, 3));
+            TestUtil.Board(b, 0, TestUtil.Cr(1, 2, 2));
+            Assert.Equal(a.Hash(), b.Hash());
+            Assert.Equal(a.Hash(), a.Clone().Hash());
+        }
+
+        [Test]
+        public static void DifferentStatesDifferentHash()
+        {
+            var a = TestUtil.NewState();
+            TestUtil.Board(a, 0, TestUtil.Cr(1, 2, 2));
+            TestUtil.Board(a, 1, TestUtil.Cr(2, 3, 3));
+            ulong h0 = a.Hash();
+            var b = a.Clone();
+            b.Apply(GameAction.Attack(1, -1));
+            Assert.True(h0 != b.Hash(), "face attack changes state");
+            var c = a.Clone();
+            c.Apply(GameAction.Attack(1, 2));
+            Assert.True(b.Hash() != c.Hash());
+            var d = a.Clone();
+            d.Players[0].Mana--;
+            Assert.True(h0 != d.Hash());
+            var e = a.Clone();
+            e.Players[1].HandCount++;
+            Assert.True(h0 != e.Hash());
+        }
+    }
+}

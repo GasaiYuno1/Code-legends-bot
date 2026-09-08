@@ -46,11 +46,17 @@ namespace Locm
         public static GameState FromInput(TurnInput input) => FromInput(input, 0);
 
         /// <summary>Состояние на начало моего хода по вводу арбитра. turn — счётчик арбитра (см. RefereeTurn).</summary>
-        public static GameState FromInput(TurnInput input, int turn)
+        public static GameState FromInput(TurnInput input, int turn) => new GameState().Load(input, turn);
+
+        /// <summary>То же, что FromInput, но в существующий объект (без аллокаций в горячем пути).</summary>
+        public GameState Load(TurnInput input, int turn)
         {
-            var s = new GameState();
+            var s = this;
             var me = s.Players[0];
             var opp = s.Players[1];
+            me.Reset();
+            opp.Reset();
+            s.Winner = -1;
 
             me.Health = input.Me.Health;
             me.MaxMana = input.Me.Mana;      // арбитр присылает maxMana; в начале хода currentMana == maxMana
@@ -83,6 +89,43 @@ namespace Locm
             s.Turn = turn;
             s.CheckWinCondition();
             return s;
+        }
+
+        // ---------------------------------------------------------------- хеш
+
+        /// <summary>
+        /// 64-битный хеш состояния для дедупликации в переборе. Не зависит от порядка карт в руке и существ
+        /// на столе (порядок на правила не влияет), учитывает всё, что влияет на дальнейшую игру.
+        /// </summary>
+        public ulong Hash()
+        {
+            ulong h = Mix((ulong)(uint)(Current | (Winner + 1) << 2 | Turn << 4));
+            for (int p = 0; p < 2; p++)
+            {
+                var pl = Players[p];
+                ulong salt = (ulong)(p + 1) * 0x9E3779B97F4A7C15UL;
+                h ^= Mix(salt ^ (ulong)(uint)(pl.Health & 0xFFFF | (pl.Mana & 0xFF) << 16 | (pl.MaxMana & 0xFF) << 24));
+                h ^= Mix(salt + 1 ^ (ulong)(uint)(pl.DeckSize & 0xFF | (pl.NextRune & 0xFF) << 8 | (pl.NextTurnDraw & 0xFF) << 16 | (pl.HandCount & 0xFF) << 24));
+                for (int i = 0; i < pl.HandKnown; i++)
+                    h ^= Mix(salt + 2 ^ (ulong)(uint)pl.Hand[i].InstanceId);
+                for (int i = 0; i < pl.BoardCount; i++)
+                {
+                    ref Creature c = ref pl.Board[i];
+                    ulong packed = (ulong)(uint)(c.InstanceId & 0xFF | (c.Attack & 0xFF) << 8 | (c.Defense & 0xFF) << 16 | (int)c.Abilities << 24)
+                                   | (c.CanAttack ? 1UL << 32 : 0) | (c.HasAttacked ? 1UL << 33 : 0);
+                    h ^= Mix(salt + 3 ^ packed);
+                }
+            }
+            return h;
+        }
+
+        /// <summary>splitmix64 finalizer.</summary>
+        private static ulong Mix(ulong z)
+        {
+            z += 0x9E3779B97F4A7C15UL;
+            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+            z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+            return z ^ (z >> 31);
         }
 
         public void CopyFrom(GameState o)

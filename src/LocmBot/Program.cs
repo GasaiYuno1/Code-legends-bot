@@ -14,7 +14,7 @@ namespace Locm
             var stdout = new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = false };
             var stderr = Console.Error;
 
-            var bot = new Bot(new FirstCardDraft(), new PassBattle(), stderr, DumpInput ? stderr : null);
+            var bot = new Bot(new RatingDraft(), new SearchBattle(), stderr, DumpInput ? stderr : null);
             bot.Run(Console.In, stdout);
         }
     }

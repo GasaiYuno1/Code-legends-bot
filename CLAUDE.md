@@ -14,10 +14,11 @@
 - `src/LocmBot/` — бот. Блочные `namespace Locm { }`, все `using` в начале файла (этого требует склейка). Внешних пакетов нет.
   - `Game/` — модель ввода: `Abilities` (flags), `Card` (readonly struct — карта как в строке ввода), `TurnInput`, `InputParser`, `CardDb` (все 160 карт; **генерируется** `tools/gen_carddb.py`, руками не править).
   - `Sim/` — симулятор правил (этап 1): `GameAction` (SUMMON/ATTACK/USE/PASS, парсинг и формат арбитра), `Creature` (существо на столе), `PlayerState` (здоровье, мана, руны, добор, рука/стол), `GameState` (`FromInput`, `LegalActions`/`IsLegal`, `Apply`/`TryApply`/`ApplySequence`, `EndTurn`, `ToInputLines`, `Clone`/`CopyFrom`). Рука противника и колоды — только счётчики (`HandCount` против известных `HandKnown`); `Players[0]` — я, `Current` — чей ход.
-  - `Draft/IDraftStrategy.cs` — `FirstCardDraft` (заглушка). `Battle/IBattleStrategy.cs` — `PassBattle` (заглушка).
-  - `Bot.cs` — оркестратор (фаза по счётчику ходов + `LooksLikeDraft`); необязательный `dump` пишет ввод и ответ каждого хода в формате логов сверки (включается константой `DumpInput` в `Program.cs`). `TurnClock.cs` — тайминг.
+  - `Draft/` — `CardRating` (статический рейтинг карты: статы, способности, эффекты минус «норма» для стоимости; веса — статические поля), `RatingDraft` (рейтинг + мана-кривая `TargetCurve` + лимит предметов + штраф за 3-ю копию); `FirstCardDraft` — заглушка.
+  - `Battle/` — `Evaluator` (линейная оценка: стол с бонусами за способности, HP нелинейно, карты в руке, штраф за пробитые руны), `SearchBattle` (этап 2: DFS по последовательностям действий своего хода — фазы призывы→предметы→атаки, призыв после атак только в освободившийся слот, дедупликация по `GameState.Hash()`, дети по убыванию оценки, стоп по часам; лучший узел из всех посещённых); `PassBattle` — заглушка. `IBattleStrategy.WarmUp` — прогрев JIT на первом ходу драфта (≤ 400 мс).
+  - `Bot.cs` — оркестратор (фаза по счётчику ходов + `LooksLikeDraft`, прогрев на ходу 0); необязательный `dump` пишет ввод и ответ каждого хода в формате логов сверки (включается константой `DumpInput` в `Program.cs`). `TurnClock.cs` — тайминг.
 - `tests/LocmBot.Tests/` — тесты **без NuGet** (свой мини-раннер `MiniTest.cs`, атрибут `[Test]` на `public static void`). `SimTests` — граничные случаи правил; `Replay.cs` — сверка симулятора с логами арбитра; `tests/fixtures/*.log` — логи случайных партий, сыгранных настоящим движком арбитра (тест `FixturesMatchReferee` требует 0 расхождений и ≥ 200 ходов).
-- `tools/bundle.py` — склейка в один файл `build/codingame.cs` для вставки на CodinGame. `tools/gen_carddb.py` — генерация `CardDb.cs`. `tools/refcheck/` — Java-обвязка над классами движка арбитра (без SDK, со стабами): случайные партии с подмешанными нелегальными действиями → логи для `replay`.
+- `tools/bundle.py` — склейка в один файл `build/codingame.cs` для вставки на CodinGame. `tools/gen_carddb.py` — генерация `CardDb.cs`. `tools/refcheck/` — Java-обвязка над классами движка арбитра (без SDK, со стабами): `run.sh` — случайные партии с подмешанными нелегальными действиями → логи для `replay`; `match.sh` — мини-арбитр «бот против бота/random» (процессы по протоколу CodinGame, стороны чередуются, замер времени хода, подсчёт нелегальных действий и таймаутов, логи в том же формате).
 - `referee/cardlist.txt` — все 160 карт (формат `baseId ; name ; type ; cost ; atk ; def ; abilities ; myHp ; oppHp ; draw ; text`), совпадает с арбитром.
 - `nuget.config` очищает источники пакетов (проект должен собираться без сети). Внешние пакеты не добавлять.
 
@@ -27,6 +28,7 @@ dotnet build src/LocmBot -c Release
 dotnet run --project tests/LocmBot.Tests                                  # все тесты; аргумент = фильтр по имени
 dotnet run --project tests/LocmBot.Tests -- replay <файлы|каталог>       # сверка симулятора с логами арбитра
 tools/refcheck/run.sh <клон LegendsOfCodeAndMagic> [seed] [игр] [каталог] # новые логи движком арбитра (Java 17+)
+tools/refcheck/match.sh <клон> <игр> <seed> "<cmd A>" "<cmd B>" [логи]  # матчи; cmd = "dotnet src/LocmBot/bin/Release/net8.0/LocmBot.dll" или random
 python3 tools/gen_carddb.py                                              # referee/cardlist.txt -> Game/CardDb.cs
 python3 tools/bundle.py                                                  # -> build/codingame.cs
 ```
@@ -43,6 +45,6 @@ python3 tools/bundle.py                                                  # -> bu
 ## План этапов
 0. ✅ Каркас: парсер, модель, заглушки, тесты, склейка.
 1. ✅ Симулятор правил (`GameState`, применение действий, генерация легальных ходов) + тесты граничных случаев; сверка с движком арбитра: 62 случайные партии, ~4000 ходов, 0 расхождений (в репозитории фикстуры на ~760 ходов). По желанию: прогнать логи реальных игр с CodinGame (`DumpInput` → `replay`).
-2. Драфт по рейтингу + мана-кривая; бой — перебор с простой оценкой. Цель: Gold.
+2. ✅ Драфт по рейтингу + мана-кривая; бой — полный перебор своего хода с простой оценкой. Локально: против random 10:0, self-play без таймаутов (полный перебор укладывается в ~35 мс, бюджет 85 мс), 0 нелегальных действий. Цель Gold — проверить на CodinGame (склейка `build/codingame.cs`).
 3. Отсечения (порядок атак, хеширование состояний), оценка с рунами, модель ответа противника. Цель: Legend.
 4. Локальный арбитр (Java/Maven) + self-play; тюнинг весов.

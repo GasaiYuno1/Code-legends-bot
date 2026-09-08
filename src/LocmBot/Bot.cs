@@ -73,6 +73,12 @@ namespace Locm
             bool isDraft = _turn < DraftTurns && turn.LooksLikeDraft;
             if (isDraft)
             {
+                // первый ход драфта даёт 1000 мс — прогреваем JIT боевого поиска, чтобы не платить за него в бою
+                if (_turn == 0)
+                {
+                    try { _battle.WarmUp(clock); }
+                    catch (Exception e) { _log.WriteLine("WarmUp error: " + e.Message); }
+                }
                 int idx = _draft.Pick(turn, _picked);
                 if (idx < 0 || idx > 2) idx = 0;
                 _picked.Add(turn.Cards[idx]);

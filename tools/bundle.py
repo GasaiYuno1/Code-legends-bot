@@ -3,7 +3,8 @@
 
 Правила, на которые опирается склейка:
   * каждый файл использует блочный `namespace Locm { ... }` (не file-scoped);
-  * все `using` стоят в начале файла — они собираются и выносятся наверх без дублей.
+  * все `using` стоят в начале файла — они собираются и выносятся наверх без дублей;
+  * строки, начинающиеся с `//` (включая `///`), выбрасываются ради лимита размера CodinGame.
 
 Запуск: python3 tools/bundle.py  ->  build/codingame.cs
 """
@@ -16,6 +17,7 @@ SRC = ROOT / "src" / "LocmBot"
 OUT = ROOT / "build" / "codingame.cs"
 
 USING_RE = re.compile(r"^\s*using\s+[\w.]+\s*;\s*$")
+COMMENT_LINE_RE = re.compile(r"^\s*//")  # строки-комментарии (в т.ч. /// doc) выбрасываем: у CodinGame лимит ~100k символов
 
 
 def main() -> int:
@@ -33,6 +35,8 @@ def main() -> int:
                 u = line.strip()
                 if u not in usings:
                     usings.append(u)
+            elif COMMENT_LINE_RE.match(line):
+                continue
             else:
                 body_lines.append(line)
         rel = path.relative_to(ROOT).as_posix()
@@ -40,7 +44,9 @@ def main() -> int:
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text("\n".join(sorted(usings)) + "\n\n" + "\n".join(bodies), encoding="utf-8")
-    print(f"{OUT.relative_to(ROOT)}: {len(files)} files, {OUT.stat().st_size} bytes")
+    text = OUT.read_text(encoding="utf-8")
+    print(f"{OUT.relative_to(ROOT)}: {len(files)} files, {OUT.stat().st_size} bytes, {len(text)} chars (CodinGame limit ~100k)")
+    return 0 if len(text) < 100_000 else 1
     return 0
 
 

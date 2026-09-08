@@ -11,6 +11,7 @@ namespace Locm
         public TurnClock(int budgetMs) { BudgetMs = budgetMs; }
 
         public long ElapsedMs => _sw.ElapsedMilliseconds;
+        public long RemainingMs => BudgetMs - _sw.ElapsedMilliseconds;
         public bool TimeUp => _sw.ElapsedMilliseconds >= BudgetMs;
     }
 

@@ -24,6 +24,12 @@ namespace Locm
         public int BoardCount;
         public readonly Creature[] Board = new Creature[GameState.MaxBoard];
 
+        public void Reset()
+        {
+            Health = 0; MaxMana = 0; Mana = 0; DeckSize = 0; NextRune = 0; NextTurnDraw = 0; DrawShown = 0; BonusManaTurns = 0;
+            HandCount = 0; HandKnown = 0; BoardCount = 0;
+        }
+
         public void CopyFrom(PlayerState o)
         {
             Health = o.Health;
