@@ -22,10 +22,11 @@ namespace Locm
         public double DrainAtkW = 0.3;
         public double BreakthroughAtkW = 0.15;
         public double ChargeW = 0.2;
-        public double HpW = 0.4;
+        public double HpW = 0.1;
         public double LowHpW = 0.8;
         public int LowHp = 10;
         public double HandCardW = 1.0;
+        public double HandRatingW = 0.0;
         public double OppDrawW = 1.5;
         public double MyDrawW = 1.2;
 
@@ -50,6 +51,14 @@ namespace Locm
             return v;
         }
 
+        public double Hand(PlayerState p)
+        {
+            double v = p.HandCount * HandCardW;
+            if (HandRatingW != 0)
+                for (int i = 0; i < p.HandKnown; i++) v += HandRatingW * CardRating.Rate(p.Hand[i]);
+            return v;
+        }
+
         public double Score(GameState s, int me)
         {
             if (s.IsOver) return s.Winner == me ? WinScore : -WinScore;
@@ -59,7 +68,7 @@ namespace Locm
             for (int i = 0; i < p.BoardCount; i++) v += Creature(in p.Board[i]);
             for (int i = 0; i < o.BoardCount; i++) v -= Creature(in o.Board[i]);
             v += Health(p.Health) - Health(o.Health);
-            v += p.HandCount * HandCardW - o.HandCount * HandCardW;
+            v += Hand(p) - Hand(o);
             v -= Math.Max(0, o.NextTurnDraw - 1) * OppDrawW;
             v += Math.Max(0, p.NextTurnDraw - 1) * MyDrawW;
             return v;
@@ -592,6 +601,8 @@ namespace Locm
 {
     public static class CardRating
     {
+        public static bool UseTable = true;
+
         public static double AttackW = 1.0;
         public static double DefenseW = 1.0;
         public static double BodyW = 0.06;
@@ -641,6 +652,13 @@ namespace Locm
 
         public static double Rate(Card c)
         {
+            if (UseTable && CardTable.Picks > 0 && c.Number > 0 && c.Number < CardTable.Rating.Length)
+                return CardTable.Rating[c.Number];
+            return Formula(c);
+        }
+
+        public static double Formula(Card c)
+        {
             switch (c.Type)
             {
                 case CardType.Creature:
@@ -667,6 +685,181 @@ namespace Locm
             }
             return 0;
         }
+    }
+}
+
+// ===== src/LocmBot/Draft/CardTable.cs =====
+namespace Locm
+{
+    public static class CardTable
+    {
+        public const int Games = 1474;
+        public const int Picks = 71010;
+
+        public static readonly double[] Rating =
+        {
+            0.0,
+            -0.388,
+            -2.069,
+            1.614,
+            -1.115,
+            0.573,
+            0.469,
+            3.080,
+            0.958,
+            1.605,
+            -2.711,
+            1.229,
+            0.722,
+            0.192,
+            -1.612,
+            0.904,
+            -1.179,
+            1.181,
+            2.685,
+            1.659,
+            -2.231,
+            1.184,
+            -0.789,
+            2.162,
+            -2.588,
+            -0.658,
+            0.616,
+            -1.064,
+            2.006,
+            2.638,
+            -0.276,
+            -2.797,
+            2.579,
+            2.266,
+            0.164,
+            -2.159,
+            0.346,
+            2.422,
+            -0.552,
+            -0.337,
+            -1.576,
+            0.272,
+            -2.522,
+            -1.681,
+            2.675,
+            -1.108,
+            -1.828,
+            -0.660,
+            2.903,
+            2.958,
+            2.389,
+            2.992,
+            2.418,
+            2.928,
+            2.199,
+            -3.665,
+            -1.177,
+            -2.897,
+            -1.221,
+            0.126,
+            -2.424,
+            0.409,
+            -0.406,
+            -2.521,
+            2.103,
+            3.126,
+            2.374,
+            2.764,
+            3.201,
+            2.930,
+            1.004,
+            -1.015,
+            -0.269,
+            0.272,
+            -0.742,
+            1.291,
+            -1.523,
+            -0.000,
+            -2.852,
+            -0.075,
+            2.721,
+            1.113,
+            2.192,
+            0.156,
+            2.442,
+            1.972,
+            -0.184,
+            1.790,
+            1.692,
+            -0.712,
+            -0.204,
+            -0.592,
+            -3.754,
+            0.033,
+            -0.639,
+            1.735,
+            1.503,
+            0.703,
+            -0.148,
+            1.884,
+            -0.610,
+            -1.206,
+            -2.284,
+            2.239,
+            0.663,
+            1.287,
+            1.183,
+            -2.522,
+            -1.989,
+            1.657,
+            -4.609,
+            1.331,
+            0.270,
+            -3.404,
+            1.363,
+            1.596,
+            2.877,
+            -2.960,
+            -0.602,
+            -0.886,
+            -0.739,
+            1.502,
+            -0.246,
+            -1.834,
+            -2.908,
+            -1.522,
+            -0.118,
+            -1.188,
+            0.912,
+            0.972,
+            -2.059,
+            -2.432,
+            -2.076,
+            1.623,
+            0.333,
+            0.753,
+            -1.813,
+            -0.736,
+            -3.501,
+            2.767,
+            -3.413,
+            0.871,
+            -2.147,
+            -4.184,
+            1.201,
+            0.630,
+            -1.430,
+            1.925,
+            1.773,
+            -0.869,
+            1.512,
+            2.982,
+            1.590,
+            -5.242,
+            -4.884,
+            0.347,
+            -4.051,
+            0.756,
+            1.830,
+            -1.137,
+            -4.751,
+        };
     }
 }
 
@@ -1341,39 +1534,9 @@ namespace Locm
             var stderr = Console.Error;
 
             var search = new SearchBattle();
-            ApplyOverrides(args, search, stderr);
+            Tuning.Apply(args, search, stderr);
             var bot = new Bot(new RatingDraft(), search, stderr, DumpInput ? stderr : null);
             bot.Run(Console.In, stdout);
-        }
-
-        private static void ApplyOverrides(string[] args, SearchBattle search, TextWriter log)
-        {
-            var e = search.Eval;
-            foreach (var arg in args)
-            {
-                int eq = arg.IndexOf('=');
-                if (eq <= 0) continue;
-                string key = arg.Substring(0, eq).ToLowerInvariant();
-                double v;
-                if (!double.TryParse(arg.Substring(eq + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out v)) continue;
-                switch (key)
-                {
-                    case "hp": e.HpW = v; break;
-                    case "lowhp": e.LowHpW = v; break;
-                    case "lowhpat": e.LowHp = (int)v; break;
-                    case "atk": e.AttackW = v; break;
-                    case "def": e.DefenseW = v; break;
-                    case "guard": e.GuardW = v; break;
-                    case "ward": e.WardW = v; break;
-                    case "lethal": e.LethalW = v; break;
-                    case "hand": e.HandCardW = v; break;
-                    case "oppdraw": e.OppDrawW = v; break;
-                    case "reply": search.ReplyWeight = v; break;
-                    case "cand": search.MaxCandidates = (int)v; break;
-                    default: log.WriteLine("unknown override: " + arg); continue;
-                }
-                log.WriteLine("override " + key + "=" + v.ToString(CultureInfo.InvariantCulture));
-            }
         }
     }
 }
@@ -2163,6 +2326,51 @@ namespace Locm
 
         public override string ToString() =>
             $"hp={Health} mana={Mana}/{MaxMana} deck={DeckSize} rune={NextRune} draw={NextTurnDraw} hand={HandKnown}/{HandCount} board={BoardCount}";
+    }
+}
+
+// ===== src/LocmBot/Tuning.cs =====
+namespace Locm
+{
+    public static class Tuning
+    {
+        public static void Apply(string[] args, SearchBattle search, TextWriter log)
+        {
+            var e = search.Eval;
+            foreach (var arg in args)
+            {
+                int eq = arg.IndexOf('=');
+                if (eq <= 0) continue;
+                string key = arg.Substring(0, eq).ToLowerInvariant();
+                double v;
+                if (!double.TryParse(arg.Substring(eq + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out v)) continue;
+                switch (key)
+                {
+                    case "hp": e.HpW = v; break;
+                    case "lowhp": e.LowHpW = v; break;
+                    case "lowhpat": e.LowHp = (int)v; break;
+                    case "atk": e.AttackW = v; break;
+                    case "def": e.DefenseW = v; break;
+                    case "guard": e.GuardW = v; break;
+                    case "guarddef": e.GuardDefW = v; break;
+                    case "ward": e.WardW = v; break;
+                    case "wardatk": e.WardAtkW = v; break;
+                    case "lethal": e.LethalW = v; break;
+                    case "drain": e.DrainAtkW = v; break;
+                    case "hand": e.HandCardW = v; break;
+                    case "handrating": e.HandRatingW = v; break;
+                    case "oppdraw": e.OppDrawW = v; break;
+                    case "mydraw": e.MyDrawW = v; break;
+                    case "reply": search.ReplyWeight = v; break;
+                    case "cand": search.MaxCandidates = (int)v; break;
+                    case "table": CardRating.UseTable = v != 0; break;
+                    default:
+                        if (log != null) log.WriteLine("unknown override: " + arg);
+                        continue;
+                }
+                if (log != null) log.WriteLine("override " + key + "=" + v.ToString(CultureInfo.InvariantCulture));
+            }
+        }
     }
 }
 

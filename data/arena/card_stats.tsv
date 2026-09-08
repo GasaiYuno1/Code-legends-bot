@@ -1,0 +1,161 @@
+baseId	name	type	cost	rating	offers	picks	pickRate	deckGames	deckWinRate
+1	Slimer	creature	1	-0.388	1323	233	0.176	200	0.47
+2	Scuttler	creature	1	-2.069	1431	48	0.034	48	0.479
+3	Beavrat	creature	1	1.614	1300	740	0.569	536	0.507
+4	Plated Toad	creature	2	-1.115	1197	121	0.101	113	0.469
+5	Grime Gnasher	creature	2	0.573	1273	422	0.332	325	0.498
+6	Murgling	creature	2	0.469	1207	383	0.317	308	0.464
+7	Rootkin Sapling	creature	2	3.08	1314	1249	0.951	687	0.508
+8	Psyshroom	creature	2	0.958	1340	554	0.413	423	0.494
+9	Corrupted Beavrat	creature	3	1.605	1366	782	0.572	507	0.501
+10	Carnivorous Bush	creature	3	-2.711	1223	25	0.02	25	0.56
+11	Snowsaur	creature	3	1.229	1392	672	0.483	502	0.518
+12	Woodshroom	creature	3	0.722	1386	528	0.381	399	0.491
+13	Swamp Terror	creature	4	0.192	1259	344	0.273	279	0.498
+14	Fanged Lunger	creature	4	-1.612	1260	75	0.06	75	0.533
+15	Pouncing Flailmouth	creature	4	0.904	1458	562	0.385	423	0.489
+16	Wrangler Fish	creature	4	-1.179	1371	124	0.09	115	0.496
+17	Ash Walker	creature	4	1.181	1497	669	0.447	456	0.496
+18	Acid Golem	creature	4	2.685	1162	974	0.838	566	0.484
+19	Foulbeast	creature	5	1.659	1427	769	0.539	512	0.502
+20	Hedge Demon	creature	5	-2.231	1410	50	0.035	46	0.522
+21	Crested Scuttler	creature	5	1.184	1360	596	0.438	444	0.495
+22	Sigbovak	creature	6	-0.789	1341	191	0.142	160	0.494
+23	Titan Cave Hog	creature	7	2.162	1343	903	0.672	596	0.493
+24	Exploding Skitterbug	creature	1	-2.588	1420	41	0.029	41	0.512
+25	Spiney Chompleaf	creature	2	-0.658	1193	176	0.148	160	0.463
+26	Razor Crab	creature	2	0.616	1323	416	0.314	315	0.486
+27	Nut Gatherer	creature	2	-1.064	1457	155	0.106	141	0.539
+28	Infested Toad	creature	2	2.006	1320	822	0.623	534	0.481
+29	Steelplume Nestling	creature	2	2.638	1269	1034	0.815	616	0.508
+30	Venomous Bog Hopper	creature	3	-0.276	1223	259	0.212	220	0.518
+31	Woodland Hunter	creature	3	-2.797	1369	31	0.023	29	0.414
+32	Sandsplat	creature	3	2.579	1380	1101	0.798	649	0.51
+33	Chameleskulk	creature	4	2.266	1333	944	0.708	554	0.495
+34	Eldritch Cyclops	creature	5	0.164	1262	289	0.229	225	0.458
+35	Snail-eyed Hulker	creature	6	-2.159	1354	52	0.038	51	0.51
+36	Possessed Skull	creature	6	0.346	1302	381	0.293	308	0.519
+37	Eldritch Multiclops	creature	6	2.422	1214	893	0.736	554	0.498
+38	Imp	creature	1	-0.552	1476	267	0.181	237	0.481
+39	Voracious Imp	creature	1	-0.337	1325	243	0.183	214	0.505
+40	Rock Gobbler	creature	3	-1.576	1468	97	0.066	95	0.463
+41	Blizzard Demon	creature	3	0.272	1255	346	0.276	258	0.496
+42	Flying Leech	creature	4	-2.522	1217	29	0.024	27	0.519
+43	Screeching Nightmare	creature	6	-1.681	1390	101	0.073	100	0.46
+44	Deathstalker	creature	6	2.675	1165	981	0.842	533	0.501
+45	Night Howler	creature	6	-1.108	1243	108	0.087	107	0.533
+46	Soul Devourer	creature	9	-1.828	1438	76	0.053	72	0.528
+47	Gnipper	creature	2	-0.66	1309	218	0.167	194	0.521
+48	Venom Hedgehog	creature	1	2.903	1281	1147	0.895	634	0.5
+49	Shiny Prowler	creature	2	2.958	1190	1094	0.919	626	0.495
+50	Puff Biter	creature	3	2.389	1247	938	0.752	591	0.489
+51	Elite Bilespitter	creature	4	2.992	1180	1080	0.915	624	0.503
+52	Bilespitter	creature	4	2.418	1403	1050	0.748	597	0.486
+53	Possessed Abomination	creature	4	2.928	1134	1029	0.907	603	0.517
+54	Shadow Biter	creature	3	2.199	1327	914	0.689	541	0.521
+55	Hermit Slime	creature	2	-3.665	1377	7	0.005	7	0.571
+56	Giant Louse	creature	4	-1.177	1132	120	0.106	106	0.481
+57	Dream-Eater	creature	4	-2.897	1270	23	0.018	23	0.522
+58	Darkscale Predator	creature	6	-1.221	1205	99	0.082	95	0.516
+59	Sea Ghost	creature	7	0.126	1222	300	0.245	243	0.527
+60	Gritsuck Troll	creature	7	-2.424	1416	39	0.028	38	0.447
+61	Alpha Troll	creature	9	0.409	1383	428	0.309	336	0.521
+62	Mutant Troll	creature	12	-0.406	1388	254	0.183	216	0.532
+63	Rootkin Drone	creature	2	-2.521	1428	33	0.023	31	0.484
+64	Coppershell Tortoise	creature	2	2.103	1355	890	0.657	528	0.504
+65	Steelplume Defender	creature	2	3.126	1403	1338	0.954	723	0.506
+66	Staring Wickerbeast	creature	5	2.374	1326	975	0.735	637	0.504
+67	Flailing Hammerhead	creature	6	2.764	1312	1112	0.848	640	0.505
+68	Giant Squid	creature	6	3.201	1439	1405	0.976	746	0.5
+69	Charging Boarhound	creature	3	2.93	1256	1144	0.911	664	0.491
+70	Murglord	creature	4	1.004	1346	566	0.421	406	0.498
+71	Flying Murgling	creature	4	-1.015	1377	156	0.113	143	0.462
+72	Shuffling Nightmare	creature	4	-0.269	1348	281	0.208	246	0.508
+73	Bog Bounder	creature	4	0.272	1446	413	0.286	324	0.478
+74	Crusher	creature	5	-0.742	1291	181	0.14	159	0.497
+75	Titan Prowler	creature	5	1.291	1335	638	0.478	477	0.503
+76	Crested Chomper	creature	6	-1.523	1208	83	0.069	81	0.444
+77	Lumbering Giant	creature	7	-0.0	1447	340	0.235	278	0.457
+78	Shambler	creature	8	-2.852	1430	20	0.014	20	0.6
+79	Scarlet Colossus	creature	8	-0.075	1543	346	0.224	283	0.509
+80	Corpse Guzzler	creature	8	2.721	1219	1009	0.828	593	0.476
+81	Flying Corpse Guzzler	creature	9	1.113	1319	578	0.438	412	0.495
+82	Slithering Nightmare	creature	7	2.192	1288	899	0.698	580	0.509
+83	Restless Owl	creature	0	0.156	1364	361	0.265	301	0.505
+84	Fighter Tick	creature	2	2.442	1367	1035	0.757	628	0.478
+85	Heartless Crow	creature	3	1.972	1446	894	0.618	560	0.507
+86	Crazed Nose-pincher	creature	3	-0.184	1439	284	0.197	245	0.522
+87	Bloat Demon	creature	4	1.79	1471	860	0.585	558	0.498
+88	Abyss Nightmare	creature	5	1.692	1366	755	0.553	509	0.477
+89	Boombeak	creature	5	-0.712	1222	168	0.137	158	0.468
+90	Eldritch Swooper	creature	8	-0.204	1232	236	0.192	207	0.522
+91	Flumpy	creature	0	-0.592	1397	200	0.143	177	0.48
+92	Wurm	creature	1	-3.754	1265	5	0.004	5	0.4
+93	Spinekid	creature	1	0.033	1201	286	0.238	234	0.504
+94	Rootkin Defender	creature	2	-0.639	1270	205	0.161	186	0.495
+95	Wildum	creature	2	1.735	1260	759	0.602	510	0.529
+96	Prairie Protector	creature	2	1.503	1230	638	0.519	445	0.497
+97	Turta	creature	3	0.703	1607	566	0.352	435	0.503
+98	Lilly Hopper	creature	3	-0.148	1274	262	0.206	231	0.498
+99	Cave Crab	creature	3	1.884	1368	833	0.609	547	0.506
+100	Stalagopod	creature	3	-0.61	1286	223	0.173	186	0.484
+101	Engulfer	creature	4	-1.206	1356	122	0.09	106	0.5
+102	Mole Demon	creature	4	-2.284	1318	44	0.033	42	0.5
+103	Mutating Rootkin	creature	4	2.239	1365	997	0.73	619	0.498
+104	Deepwater Shellcrab	creature	4	0.663	1421	490	0.345	373	0.501
+105	King Shellcrab	creature	5	1.287	1201	574	0.478	430	0.498
+106	Far-reaching Nightmare	creature	5	1.183	1322	576	0.436	417	0.53
+107	Worker Shellcrab	creature	5	-2.522	1299	30	0.023	26	0.423
+108	Rootkin Elder	creature	5	-1.989	1260	72	0.057	65	0.415
+109	Elder Engulfer	creature	5	1.657	1201	687	0.572	492	0.514
+110	Gargoyle	creature	5	-4.609	1352	0	0.0	0	
+111	Turta Knight	creature	6	1.331	1503	735	0.489	500	0.506
+112	Rootkin Leader	creature	6	0.27	1564	460	0.294	363	0.493
+113	Tamed Bilespitter	creature	6	-3.404	1371	9	0.007	9	0.556
+114	Gargantua	creature	7	1.363	1258	659	0.524	473	0.493
+115	Rootkin Warchief	creature	8	1.596	1246	645	0.518	435	0.515
+116	Emperor Nightmare	creature	12	2.877	1266	1123	0.887	610	0.502
+117	Protein	itemGreen	1	-2.96	1492	29	0.019	29	0.517
+118	Royal Helm	itemGreen	0	-0.602	1325	181	0.137	159	0.56
+119	Serrated Shield	itemGreen	1	-0.886	1265	143	0.113	119	0.538
+120	Venomfruit	itemGreen	2	-0.739	1491	195	0.131	157	0.478
+121	Enchanted Hat	itemGreen	2	1.502	1305	655	0.502	461	0.518
+122	Bolstering Bread	itemGreen	2	-0.246	1208	243	0.201	214	0.509
+123	Wristguards	itemGreen	2	-1.834	1459	78	0.053	78	0.513
+124	Blood Grapes	itemGreen	3	-2.908	1335	18	0.013	18	0.222
+125	Healthy Veggies	itemGreen	3	-1.522	1255	86	0.069	78	0.397
+126	Heavy Shield	itemGreen	3	-0.118	1522	326	0.214	286	0.507
+127	Imperial Helm	itemGreen	3	-1.188	1409	121	0.086	105	0.467
+128	Enchanted Cloth	itemGreen	4	0.912	1196	452	0.378	340	0.526
+129	Enchanted Leather	itemGreen	4	0.972	1268	523	0.412	398	0.51
+130	Helm of Remedy	itemGreen	4	-2.059	1123	44	0.039	44	0.477
+131	Heavy Gauntlet	itemGreen	4	-2.432	1274	45	0.035	45	0.533
+132	High Protein	itemGreen	5	-2.076	1454	49	0.034	49	0.429
+133	Pie of Power	itemGreen	5	1.623	1269	670	0.528	490	0.51
+134	Light The Way	itemGreen	4	0.333	1435	418	0.291	326	0.488
+135	Imperial Armour	itemGreen	6	0.753	1334	481	0.361	367	0.515
+136	Buckler	itemGreen	0	-1.813	1486	77	0.052	71	0.549
+137	Ward	itemGreen	2	-0.736	1399	183	0.131	163	0.472
+138	Grow Horns	itemGreen	2	-3.501	1332	8	0.006	8	0.375
+139	Grow Stingers	itemGreen	4	2.767	1331	1125	0.845	625	0.52
+140	Grow Wings	itemGreen	2	-3.413	1428	12	0.008	12	0.5
+141	Throwing Knife	itemRed	0	0.871	1300	541	0.416	391	0.501
+142	Staff of Suppression	itemRed	0	-2.147	1233	56	0.045	52	0.462
+143	Pierce Armour	itemRed	0	-4.184	1429	4	0.003	4	0.25
+144	Rune Axe	itemRed	1	1.201	1265	580	0.458	419	0.532
+145	Cursed Sword	itemRed	3	0.63	1517	530	0.349	397	0.484
+146	Cursed Scimitar	itemRed	4	-1.43	1384	92	0.066	85	0.447
+147	Quick Shot	itemRed	2	1.925	1367	865	0.633	514	0.504
+148	Helm Crusher	itemRed	2	1.773	1243	712	0.573	461	0.462
+149	Rootkin Ritual	itemRed	3	-0.869	1252	158	0.126	141	0.411
+150	Throwing Axe	itemRed	2	1.512	1356	718	0.529	522	0.487
+151	Decimate	itemRed	5	2.982	1383	1259	0.91	653	0.507
+152	Mighty Throwing Axe	itemRed	7	1.59	1352	712	0.527	484	0.512
+153	Healing Potion	itemBlue	2	-5.242	1318	0	0.0	0	
+154	Poison	itemBlue	2	-4.884	1226	0	0.0	0	
+155	Scroll of Firebolt	itemBlue	3	0.347	1461	396	0.271	310	0.497
+156	Major Life Steal Potion	itemBlue	3	-4.051	1242	3	0.002	3	0.667
+157	Life Sap Drop	itemBlue	3	0.756	1410	534	0.379	394	0.472
+158	Tome of Thunder	itemBlue	3	1.83	1296	764	0.59	473	0.501
+159	Vial of Soul Drain	itemBlue	4	-1.137	1300	128	0.098	114	0.491
+160	Minor Life Steal Potion	itemBlue	2	-4.751	1317	0	0.0	0	
