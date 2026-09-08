@@ -44,7 +44,7 @@ namespace Locm
         public bool NetDeepOnly = true;
         private readonly NetEval _net = new NetEval();
         /// <summary>Доля оценки «после ответа противника» в итоговой (остальное — статика).</summary>
-        public double ReplyWeight = 0.75;
+        public double ReplyWeight = 0.9;
         /// <summary>Сколько лучших состояний переоценивать ответом противника.</summary>
         public int MaxCandidates = 1024;
         /// <summary>Доля бюджета времени на этап 1.</summary>

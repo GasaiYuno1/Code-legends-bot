@@ -11,28 +11,28 @@ namespace Locm
 public sealed class Evaluator
 {
 public const double WinScore = 1e6;
-public double AttackW = 1.0;
-public double DefenseW = 0.8;
-public double GuardW = 0.8;
-public double GuardDefW = 0.25;
-public double WardW = 1.2;
-public double WardAtkW = 0.3;
-public double LethalW = 1.5;
-public double DrainAtkW = 0.3;
-public double BreakthroughAtkW = 0.15;
-public double ChargeW = 0.2;
-public double Fragile1W = 0.0;
+public double AttackW = 0.957;
+public double DefenseW = 0.657;
+public double GuardW = 0.792;
+public double GuardDefW = 0.007;
+public double WardW = 1.114;
+public double WardAtkW = 0.48;
+public double LethalW = 2.078;
+public double DrainAtkW = 0.222;
+public double BreakthroughAtkW = 0.055;
+public double ChargeW = 0.195;
+public double Fragile1W = 0.013;
 public double Fragile2W = 0.0;
-public double BlueHandW = 0.0;
-public double HpW = 0.1;
-public double LowHpW = 0.8;
+public double BlueHandW = 0.146;
+public double HpW = 0.102;
+public double LowHpW = 0.968;
 public int LowHp = 10;
-public double MidHpW = 0.0;
+public double MidHpW = 0.047;
 public int MidHp = 20;
-public double HandCardW = 1.0;
-public double HandRatingW = 0.0;
-public double OppDrawW = 1.5;
-public double MyDrawW = 1.2;
+public double HandCardW = 1.363;
+public double HandRatingW = 0.094;
+public double OppDrawW = 1.489;
+public double MyDrawW = 1.51;
 public double Creature(in Creature c)
 {
 double v = c.Attack * AttackW + c.Defense * DefenseW;
@@ -393,7 +393,7 @@ public double NetScale = 10.0;
 public bool NetAdditive = false;
 public bool NetDeepOnly = true;
 private readonly NetEval _net = new NetEval();
-public double ReplyWeight = 0.75;
+public double ReplyWeight = 0.9;
 public int MaxCandidates = 1024;
 public double Phase1Share = 0.6;
 public int DeepReplyCandidates = 32;
@@ -401,6 +401,11 @@ public int DeepReplyNodes = 400;
 public int SampledCandidates = 0;
 public int SampledHands = 2;
 public int SampledNodes = 400;
+public int ExactLethalNodes = 0;
+public int LethalRiskCandidates = 0;
+public int LethalRiskHands = 4;
+public int LethalRiskNodes = 300;
+public double LethalRiskW = 30.0;
 public int WarmUpMs = 400;
 public int CounterCandidates = 0;
 public int CounterNodes = 1500;
@@ -419,10 +424,13 @@ private readonly GameState _replyBest = new GameState();
 private readonly GameState _sampledBest = new GameState();
 private readonly Card[][] _hands = new Card[8][];
 private readonly int[] _handLen = new int[8];
+private int _preparedHands;
 private ulong _rng;
 public readonly OpponentModel Opponent = new OpponentModel();
 private int _sampledPlayer;
 private Evaluator _sampledEval;
+private bool _lethalOnly;
+public int RiskScored { get; private set; }
 private readonly GameState[] _cPool = new GameState[MaxDepth + 2];
 private readonly List<GameAction>[] _cLegal = new List<GameAction>[MaxDepth + 1];
 private readonly HashSet<ulong> _cVisited = new HashSet<ulong>();
@@ -529,6 +537,7 @@ Rescored = 0;
 DeepRescored = 0;
 CounterScored = 0;
 SampledScored = 0;
+RiskScored = 0;
 _visited.Clear();
 if (!ReferenceEquals(root, _pool[0])) _pool[0].CopyFrom(root);
 int me = _pool[0].Current;
@@ -748,6 +757,42 @@ bestIdx = order[i];
 }
 }
 if (bestIdx < 0) return;
+if (LethalRiskCandidates > 0 && LethalRiskHands > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver
+&& _heap[bestIdx].State.Players[1 - me].HandCount + 1 > 0)
+{
+int k = Math.Min(deepDone, LethalRiskCandidates);
+for (int i = 0; i < k; i++)
+{
+int best = i;
+for (int j = i + 1; j < deepDone; j++) if (_final[order[j]] > _final[order[best]]) best = j;
+int t = order[i]; order[i] = order[best]; order[best] = t;
+}
+PrepareHands(_heap[order[0]].State, me, LethalRiskHands);
+double bestR = double.NegativeInfinity;
+int bestRIdx = -1;
+for (int i = 0; i < k; i++)
+{
+if (_clock.TimeUp) { TimedOut = true; break; }
+Candidate c = _heap[order[i]];
+double f = _final[order[i]];
+if (f > -Evaluator.WinScore / 2 && f < Evaluator.WinScore / 2)
+{
+f -= LethalRiskW * LethalRisk(c.State, me);
+_final[order[i]] = f;
+RiskScored++;
+}
+if (f > bestR)
+{
+bestR = f;
+bestRIdx = order[i];
+}
+}
+if (bestRIdx >= 0)
+{
+bestFinal = bestR;
+bestIdx = bestRIdx;
+}
+}
 if (SampledCandidates > 0 && SampledHands > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver)
 {
 int k = Math.Min(deepDone, SampledCandidates);
@@ -757,7 +802,7 @@ int best = i;
 for (int j = i + 1; j < deepDone; j++) if (_final[order[j]] > _final[order[best]]) best = j;
 int t = order[i]; order[i] = order[best]; order[best] = t;
 }
-PrepareHands(_heap[order[0]].State, me);
+PrepareHands(_heap[order[0]].State, me, SampledHands);
 double bestS = double.NegativeInfinity;
 int bestSIdx = -1;
 for (int i = 0; i < k; i++)
@@ -837,7 +882,7 @@ for (int i = 0; i < o.BoardCount; i++) totalAttack += o.Board[i].Attack;
 int guardDefense = 0;
 for (int i = 0; i < p.BoardCount; i++)
 if (p.Board[i].Has(Abilities.Guard)) guardDefense += p.Board[i].Defense;
-if (totalAttack - guardDefense >= p.Health) return -Evaluator.WinScore;
+if (totalAttack - guardDefense >= p.Health && (ExactLethalNodes == 0 || AttackLethal(after, me, ExactLethalNodes))) return -Evaluator.WinScore;
 int n = o.BoardCount;
 for (int i = 0; i < n; i++) _order[i] = i;
 for (int i = 1; i < n; i++)
@@ -880,6 +925,13 @@ s.CopyFrom(after);
 s.EndTurn();
 if (s.IsOver) return Leaf(s, me);
 int opp = s.Current;
+if (ExactLethalNodes > 0 && AttackLethal(after, me, ExactLethalNodes))
+{
+_replyBest.CopyFrom(_sampledBest);
+_oppBestLen = Math.Min(_cBestLen, _oppBestLine.Length);
+Array.Copy(_cBestLine, _oppBestLine, _oppBestLen);
+return Leaf(_sampledBest, me);
+}
 _oppVisited.Clear();
 _oppVisited.Add(s.Hash());
 _oppNodes = 0;
@@ -945,7 +997,7 @@ for (int i = 0; i < _oppBestLen; i++) into.Add(_oppBestLine[i]);
 }
 public double SampledFinal(GameState after, int me)
 {
-PrepareHands(after, me);
+PrepareHands(after, me, SampledHands);
 double st = UseNet ? Leaf(after, me) : Eval.Score(after, me);
 return ReplyWeight * SampledReplyScore(after, me) + (1 - ReplyWeight) * st;
 }
@@ -953,15 +1005,16 @@ public void PredictFullReply(GameState after, int me, List<GameAction> into)
 {
 into.Clear();
 if (after.IsOver) return;
-PrepareHands(after, me);
+PrepareHands(after, me, SampledHands);
 SampledReplyScore(after, me);
 for (int i = 0; i < _fullBestLen; i++) into.Add(_fullBestLine[i]);
 }
-private void PrepareHands(GameState anyCandidate, int me)
+private void PrepareHands(GameState anyCandidate, int me, int hands)
 {
 _rng = (ulong)anyCandidate.Players[1 - me].HandCount * 0x9E3779B97F4A7C15UL + 0x2545F4914F6CDD1DUL + (ulong)anyCandidate.Turn;
 int n = Math.Min(8, anyCandidate.Players[1 - me].HandCount + 1);
-for (int k = 0; k < SampledHands && k < _hands.Length; k++)
+_preparedHands = Math.Min(hands, _hands.Length);
+for (int k = 0; k < _preparedHands; k++)
 {
 if (_hands[k] == null || _hands[k].Length != n) _hands[k] = new Card[n];
 int got = Opponent.Sample(ref _rng, _hands[k], n, 1000 + k * 16);
@@ -973,7 +1026,7 @@ public double SampledReplyScore(GameState after, int me)
 if (after.IsOver) return Leaf(after, me);
 double sum = 0;
 int samples = 0;
-for (int k = 0; k < SampledHands && k < _hands.Length && _hands[k] != null; k++)
+for (int k = 0; k < _preparedHands && _hands[k] != null; k++)
 {
 var s = _cPool[0];
 s.CopyFrom(after);
@@ -1000,6 +1053,139 @@ samples++;
 }
 return samples == 0 ? DeepReplyScore(after, me) : sum / samples;
 }
+public double LethalRisk(GameState after, int me)
+{
+if (after.IsOver) return after.Winner == me ? 0.0 : 1.0;
+int lethal = 0, samples = 0;
+for (int k = 0; k < _preparedHands && _hands[k] != null; k++)
+{
+var s = _cPool[0];
+s.CopyFrom(after);
+s.EndTurn();
+samples++;
+if (s.IsOver) { if (s.Winner != me) lethal++; continue; }
+int opp = s.Current;
+var o = s.Players[opp];
+o.HandKnown = 0;
+int give = Math.Min(o.HandCount, _handLen[k]);
+for (int i = 0; i < give; i++) o.Hand[o.HandKnown++] = _hands[k][i];
+_cVisited.Clear();
+_cVisited.Add(s.Hash());
+_cNodes = 0;
+_cRootBoard = o.BoardCount;
+_sampledPlayer = opp;
+_sampledEval = OppEval;
+_cBest = OppEval.Score(s, opp);
+_cBestLen = 0;
+_sampledBest.CopyFrom(s);
+_lethalOnly = true;
+FullDfs(0, ActionType.Pass, opp, LethalRiskNodes);
+_lethalOnly = false;
+if (_sampledBest.IsOver && _sampledBest.Winner == opp)
+{
+lethal++;
+_fullBestLen = _cBestLen;
+Array.Copy(_cBestLine, _fullBestLine, _cBestLen);
+}
+}
+return samples == 0 ? 0.0 : (double)lethal / samples;
+}
+public bool AttackLethal(GameState after, int me, int nodeCap)
+{
+if (after.IsOver) return after.Winner != me;
+var s = _cPool[0];
+s.CopyFrom(after);
+s.EndTurn();
+if (s.IsOver) return s.Winner != me;
+int opp = s.Current;
+var o = s.Players[opp];
+o.HandKnown = 0;
+_cVisited.Clear();
+_cVisited.Add(s.Hash());
+_cNodes = 0;
+_cRootBoard = o.BoardCount;
+_sampledPlayer = opp;
+_sampledEval = OppEval;
+_cBest = OppEval.Score(s, opp);
+_cBestLen = 0;
+_sampledBest.CopyFrom(s);
+_lethalOnly = true;
+FullDfs(0, ActionType.Pass, opp, nodeCap);
+_lethalOnly = false;
+return _sampledBest.IsOver && _sampledBest.Winner == opp;
+}
+public bool GreedyLethal(GameState after, int me)
+{
+if (after.IsOver) return after.Winner != me;
+var s = _cPool[0];
+s.CopyFrom(after);
+s.EndTurn();
+if (s.IsOver) return s.Winner != me;
+var o = s.Players[s.Current];
+var p = s.Players[me];
+int totalAttack = 0;
+for (int i = 0; i < o.BoardCount; i++) totalAttack += o.Board[i].Attack;
+int guardDefense = 0;
+for (int i = 0; i < p.BoardCount; i++)
+if (p.Board[i].Has(Abilities.Guard)) guardDefense += p.Board[i].Defense;
+return totalAttack - guardDefense >= p.Health;
+}
+public string DescribeRisk()
+{
+var sb = new System.Text.StringBuilder();
+for (int k = 0; k < _preparedHands; k++)
+{
+sb.Append("   hand ").Append(k).Append(':');
+for (int i = 0; i < _handLen[k]; i++) sb.Append(' ').Append(_hands[k][i].Number).Append('/').Append(_hands[k][i].Cost).Append('m');
+sb.AppendLine();
+}
+sb.Append("   lethal line:");
+for (int i = 0; i < _fullBestLen; i++) sb.Append(' ').Append(_fullBestLine[i]).Append(';');
+sb.AppendLine();
+return sb.ToString();
+}
+public double LethalRiskScore(GameState after, int me)
+{
+PrepareHands(after, me, LethalRiskHands);
+return LethalRisk(after, me);
+}
+private static bool LethalUseful(GameState s, GameAction a, int player)
+{
+var p = s.Players[player];
+var enemy = s.Players[1 - player];
+switch (a.Type)
+{
+case ActionType.Summon:
+{
+int h = p.FindHand(a.Id);
+if (h < 0) return false;
+var c = p.Hand[h];
+return (c.Abilities & Abilities.Charge) != 0 || c.OpponentHealthChange < 0;
+}
+case ActionType.Attack:
+{
+if (a.Target < 0) return true;
+int t = enemy.FindCreature(a.Target);
+return t >= 0 && enemy.Board[t].Has(Abilities.Guard);
+}
+case ActionType.Use:
+{
+int h = p.FindHand(a.Id);
+if (h < 0) return false;
+var c = p.Hand[h];
+if (c.Type == CardType.GreenItem)
+{
+int t = p.FindCreature(a.Target);
+return t >= 0 && p.Board[t].CanAttack && !p.Board[t].HasAttacked;
+}
+if (a.Target < 0) return c.Type == CardType.BlueItem;
+int e = enemy.FindCreature(a.Target);
+return e >= 0 && enemy.Board[e].Has(Abilities.Guard);
+}
+default:
+return false;
+}
+}
 private void FullDfs(int depth, ActionType last, int player, int nodeCap)
 {
 if (depth + 1 >= _cPool.Length || depth >= _children.Length) return;
@@ -1013,6 +1199,7 @@ for (int i = 0; i < legal.Count && n < kids.Length; i++)
 {
 GameAction a = legal[i];
 if (a.IsPass || !CounterAllowed(last, a.Type, s)) continue;
+if (_lethalOnly && !LethalUseful(s, a, player)) continue;
 if (_cNodes >= nodeCap) break;
 child.CopyFrom(s);
 child.Apply(a);
@@ -1305,10 +1492,11 @@ else v -= c.OpponentHealthChange * OppDamageW;
 v += c.MyHealthChange * MyHealW;
 return v;
 }
+public static double SelfW = 20.0;
 public static double Rate(Card c)
 {
 if (UseTable && CardTable.Picks > 0 && c.Number > 0 && c.Number < CardTable.Rating.Length)
-return CardTable.Rating[c.Number];
+return CardTable.Rating[c.Number] + (SelfW != 0 && c.Number < CardTable.SelfPlay.Length ? SelfW * CardTable.SelfPlay[c.Number] : 0.0);
 return Formula(c);
 }
 public static double Formula(Card c)
@@ -1348,11 +1536,13 @@ public static class CardTable
 public const int Games = 1474;
 public const int Picks = 71010;
 private const string Packed = "-39,-207,161,-111,57,47,308,96,161,-271,123,72,19,-161,90,-118,118,269,166,-223,118,-79,216,-259,-66,62,-106,201,264,-28,-280,258,227,16,-216,35,242,-55,-34,-158,27,-252,-168,268,-111,-183,-66,290,296,239,299,242,293,220,-366,-118,-290,-122,13,-242,41,-41,-252,210,313,237,276,320,293,100,-102,-27,27,-74,129,-152,0,-285,-7,272,111,219,16,244,197,-18,179,169,-71,-20,-59,-375,3,-64,173,150,70,-15,188,-61,-121,-228,224,66,129,118,-252,-199,166,-461,133,27,-340,136,160,288,-296,-60,-89,-74,150,-25,-183,-291,-152,-12,-119,91,97,-206,-243,-208,162,33,75,-181,-74,-350,277,-341,87,-215,-418,120,63,-143,192,177,-87,151,298,159,-524,-488,35,-405,76,183,-114,-475";
-private const string PackedWin = "-63,-213,171,-128,56,11,319,89,162,-262,145,62,18,-148,78,-120,113,248,168,-217,113,-83,207,-256,-92,47,-81,177,275,-12,-295,272,220,-20,-213,54,240,-72,-30,-175,24,-249,-188,269,-94,-172,-50,290,289,224,304,223,316,247,-363,-128,-287,-114,37,-254,63,-13,-255,215,321,243,283,320,281,98,-126,-20,5,-76,133,-176,-42,-273,1,240,106,231,21,214,206,2,177,141,-93,-3,-74,-379,7,-68,211,146,74,-17,197,-73,-121,-228,221,68,126,153,-264,-229,183,-461,141,20,-337,127,177,290,-293,-19,-67,-89,173,-17,-178,-322,-194,-5,-136,119,109,-212,-234,-228,175,20,92,-162,-93,-357,304,-341,89,-226,-425,158,44,-166,197,131,-144,134,308,174,-524,-488,31,-402,44,184,-119,-475";
+private const string PackedWin = "";
 public static bool UseWinAdjusted = false;
+private const string PackedSelf = "-6,-13,-1,2,1,0,2,2,1,-18,3,-1,1,-6,1,1,3,2,2,-3,1,4,5,-16,0,1,-5,2,3,-2,-19,2,3,3,-1,2,4,-2,-4,-11,0,-10,-4,3,7,-1,0,2,3,2,4,2,3,2,-35,-4,-15,1,4,-3,7,7,-23,1,2,4,3,5,2,2,-3,4,-1,1,2,-5,3,-10,5,4,3,3,-2,2,0,3,0,3,-2,3,-2,-30,-4,-3,2,-1,0,-2,1,-3,-5,-9,2,1,2,2,-9,-12,2,-20,3,3,-21,4,6,5,-18,-5,-3,1,3,0,-8,-22,-3,2,1,4,4,-12,-6,-6,4,3,3,-10,1,-20,4,-17,0,-11,-32,1,2,-4,4,2,1,3,4,4,-32,-19,0,-22,2,3,-6,-38";
 public static double[] Rating => UseWinAdjusted ? _win : _pick;
+public static readonly double[] SelfPlay = PackedSelf.Length == 0 ? new double[Unpack(Packed).Length] : Unpack(PackedSelf);
 private static readonly double[] _pick = Unpack(Packed);
-private static readonly double[] _win = Unpack(PackedWin);
+private static readonly double[] _win = Unpack(PackedWin.Length == 0 ? Packed : PackedWin);
 private static double[] Unpack(string packed)
 {
 var parts = packed.Split(',');
@@ -1382,9 +1572,12 @@ public static int MaxItems = 8;
 public static double ItemOverPenalty = 3.0;
 public static int MaxSameCard = 2;
 public static double SameCardPenalty = 0.0;
+public static double Explore = 0.0;
+private static readonly Random _rng = new Random();
 private readonly int[] _curve = new int[8];
 public int Pick(TurnInput input, IReadOnlyList<Card> alreadyPicked)
 {
+if (Explore > 0 && _rng.NextDouble() < Explore) return _rng.Next(Math.Min(3, input.Cards.Count));
 Array.Clear(_curve, 0, _curve.Length);
 int items = 0;
 foreach (var c in alreadyPicked)
@@ -2768,6 +2961,11 @@ case "sampled": search.SampledCandidates = (int)v; break;
 case "hands": search.SampledHands = (int)v; break;
 case "samplednodes": search.SampledNodes = (int)v; break;
 case "warmup": search.WarmUpMs = (int)v; break;
+case "exactlethal": search.ExactLethalNodes = (int)v; break;
+case "risk": search.LethalRiskCandidates = (int)v; break;
+case "riskw": search.LethalRiskW = v; break;
+case "riskhands": search.LethalRiskHands = (int)v; break;
+case "risknodes": search.LethalRiskNodes = (int)v; break;
 case "net": search.UseNet = v != 0; break;
 case "netscale": search.NetScale = v; break;
 case "netadd": search.NetAdditive = v != 0; break;
@@ -2779,6 +2977,8 @@ case "draftwin": CardTable.UseWinAdjusted = v != 0; break;
 case "maxitems": RatingDraft.MaxItems = (int)v; break;
 case "itempenalty": RatingDraft.ItemOverPenalty = v; break;
 case "samecard": RatingDraft.SameCardPenalty = v; break;
+case "draftexplore": RatingDraft.Explore = v; break;
+case "selfw": CardRating.SelfW = v; break;
 default:
 if (log != null) log.WriteLine("unknown override: " + arg);
 continue;

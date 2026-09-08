@@ -113,7 +113,8 @@ def main():
     ap.add_argument("--check", help="json с θ: только матч против эталона")
     ap.add_argument("--vs", nargs=2, metavar=("ARGS_A", "ARGS_B"),
                     help="только матч: аргументы key=value для A и для B (строки), --games партий, --bot сборка")
-    ap.add_argument("--bot", default=str(BOT), help="LocmBot.dll для --vs")
+    ap.add_argument("--bot", default=str(BOT), help="LocmBot.dll для --vs (сторона A)")
+    ap.add_argument("--bot-b", default=None, help="LocmBot.dll для стороны B в --vs (по умолчанию тот же, что --bot)")
     ap.add_argument("--classes", default=str(CLASSES), help="каталог классов BotMatch")
     args = ap.parse_args()
     CLASSES = Path(args.classes)
@@ -121,7 +122,7 @@ def main():
 
     if args.vs:
         a = f"dotnet {args.bot} warmup=0 {args.vs[0]}".strip()
-        b = f"dotnet {args.bot} warmup=0 {args.vs[1]}".strip()
+        b = f"dotnet {args.bot_b or args.bot} warmup=0 {args.vs[1]}".strip()
         t0 = time.time()
         w, n = match(args.games, args.seed + 999, a, b, args.workers)
         print(f"A {w}/{n} = {100.0 * w / n:.1f}% ({time.time() - t0:.0f} s)\n  A: {args.vs[0]}\n  B: {args.vs[1]}")

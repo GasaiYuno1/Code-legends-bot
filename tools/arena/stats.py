@@ -56,6 +56,7 @@ def main():
     ap.add_argument("--table", default="src/LocmBot/Draft/CardTable.cs")
     ap.add_argument("--out", default="data/arena/card_stats.tsv")
     ap.add_argument("--scale", type=float, default=2.0, help="std рейтинга в таблице")
+    ap.add_argument("--win-table", action="store_true", help="записать и PackedWin (по умолчанию пусто ради размера склейки)")
     ap.add_argument("--win-weight", type=float, default=20.0,
                     help="вторая таблица: + w*(винрейт колод с картой - 0.5)*n/(n+300) — сдвиг к тому, что выигрывает, а не к тому, что берут")
     args = ap.parse_args()
@@ -153,7 +154,7 @@ def main():
             "",
             "        // сотые доли рейтинга для baseId 1..160",
             f"        private const string Packed = \"{values}\";",
-            f"        private const string PackedWin = \"{values_win}\";",
+            f"        private const string PackedWin = \"{values_win if args.win_table else ''}\";   // таблица с поправкой на винрейт арены (draftwin=1) — шум, из склейки убрана ради размера; восстановить: tools/arena/stats.py --win-table",
             "",
             "        /// <summary>true — таблица с поправкой на винрейт колод (что выигрывает), false — чистые пики (что берут).</summary>",
             "        public static bool UseWinAdjusted = false;",
@@ -164,7 +165,7 @@ def main():
             "        public static double[] Rating => UseWinAdjusted ? _win : _pick;",
             "        public static readonly double[] SelfPlay = PackedSelf.Length == 0 ? new double[Unpack(Packed).Length] : Unpack(PackedSelf);",
             "        private static readonly double[] _pick = Unpack(Packed);",
-            "        private static readonly double[] _win = Unpack(PackedWin);",
+            "        private static readonly double[] _win = Unpack(PackedWin.Length == 0 ? Packed : PackedWin);",
             "",
             "        private static double[] Unpack(string packed)",
             "        {",
