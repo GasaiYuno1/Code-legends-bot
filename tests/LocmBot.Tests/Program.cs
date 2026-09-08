@@ -10,6 +10,8 @@ namespace Locm.Tests
         {
             if (args.Length > 0 && args[0] == "replay")
                 return ReplayMain(args);
+            if (args.Length > 0 && args[0] == "features")
+                return FeatureExport.Run(args[1], args.Length > 2 ? args[2] : "build/features.tsv");
             if (args.Length > 0 && args[0] == "bench")
                 return Bench.Run(args.Length > 1 ? args[1] : Replay.FixturesDir(), args.Length > 2 ? int.Parse(args[2]) : 30, args.Length > 3 ? int.Parse(args[3]) : 300);
             if (args.Length > 0 && args[0] == "replycheck")

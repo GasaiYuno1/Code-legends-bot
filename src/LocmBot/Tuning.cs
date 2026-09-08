@@ -70,6 +70,9 @@ namespace Locm
                     case "deep": search.DeepReplyCandidates = (int)v; break;
                     case "deepnodes": search.DeepReplyNodes = (int)v; break;
                     case "counter": search.CounterCandidates = (int)v; break;
+                    case "net": search.UseNet = v != 0; break;
+                    case "netscale": search.NetScale = v; break;
+                    case "netadd": search.NetAdditive = v != 0; break;
                     case "counternodes": search.CounterNodes = (int)v; break;
                     case "table": CardRating.UseTable = v != 0; break;
                     case "curvew": RatingDraft.CurveW = v; break;

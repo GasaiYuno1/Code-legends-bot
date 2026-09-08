@@ -34,6 +34,13 @@ namespace Locm
         public readonly Evaluator Eval;
         /// <summary>Оценка, которой противник выбирает ответ в модели (по умолчанию — копия моей; калибруется по его реальным ответам).</summary>
         public Evaluator OppEval;
+        /// <summary>Оценивать листья (после моего хода и после ответа противника) обучаемой сетью NetEval вместо линейной оценки.</summary>
+        public bool UseNet = false;
+        /// <summary>Масштаб логита сети в единицах линейной оценки (важен только для сравнения с WinScore).</summary>
+        public double NetScale = 10.0;
+        /// <summary>true — сеть добавляется к линейной оценке (поправка), false — заменяет её.</summary>
+        public bool NetAdditive = false;
+        private readonly NetEval _net = new NetEval();
         /// <summary>Доля оценки «после ответа противника» в итоговой (остальное — статика).</summary>
         public double ReplyWeight = 0.75;
         /// <summary>Сколько лучших состояний переоценивать ответом противника.</summary>
@@ -360,7 +367,8 @@ namespace Locm
                 }
                 Candidate c = _heap[i];
                 double reply = ReplyScore(c.State, me);
-                double final = ReplyWeight * reply + (1 - ReplyWeight) * c.Static;
+                double stat = UseNet ? Leaf(c.State, me) : c.Static;
+                double final = ReplyWeight * reply + (1 - ReplyWeight) * stat;
                 if (i < _final.Length) _final[i] = final;
                 scored = i + 1;
                 Rescored++;
@@ -394,7 +402,7 @@ namespace Locm
                     if (_clock.TimeUp) { TimedOut = true; break; }
                     Candidate c = _heap[order[i]];
                     double deep = DeepReplyScore(c.State, me);
-                    double final = ReplyWeight * deep + (1 - ReplyWeight) * c.Static;
+                    double final = ReplyWeight * deep + (1 - ReplyWeight) * (UseNet ? Leaf(c.State, me) : c.Static);
                     _final[order[i]] = final;
                     DeepRescored++;
                     deepDone = i + 1;
@@ -424,7 +432,7 @@ namespace Locm
                         Candidate c = _heap[order[i]];
                         DeepReplyScore(c.State, me);           // заново: заполняет _replyBest
                         double counter = CounterScore(me);
-                        double final = ReplyWeight * counter + (1 - ReplyWeight) * c.Static;
+                        double final = ReplyWeight * counter + (1 - ReplyWeight) * (UseNet ? Leaf(c.State, me) : c.Static);
                         CounterScored++;
                         if (final > bestCounter)
                         {
@@ -459,11 +467,11 @@ namespace Locm
         /// </summary>
         public double ReplyScore(GameState after, int me)
         {
-            if (after.IsOver) return Eval.Score(after, me);
+            if (after.IsOver) return Leaf(after, me);
             var s = _scratch;
             s.CopyFrom(after);
             s.EndTurn();
-            if (s.IsOver) return Eval.Score(s, me);
+            if (s.IsOver) return Leaf(s, me);
 
             int opp = s.Current;
             var o = s.Players[opp];
@@ -510,7 +518,7 @@ namespace Locm
                 }
                 if (bestTarget != int.MinValue) s.Apply(GameAction.Attack(id, bestTarget));
             }
-            return Eval.Score(s, me);
+            return Leaf(s, me);
         }
 
         /// <summary>
@@ -519,22 +527,30 @@ namespace Locm
         /// </summary>
         public double DeepReplyScore(GameState after, int me)
         {
-            if (after.IsOver) return Eval.Score(after, me);
+            if (after.IsOver) return Leaf(after, me);
             var s = _oppPool[0];
             s.CopyFrom(after);
             s.EndTurn();
-            if (s.IsOver) return Eval.Score(s, me);
+            if (s.IsOver) return Leaf(s, me);
             int opp = s.Current;
             _oppVisited.Clear();
             _oppVisited.Add(s.Hash());
             _oppNodes = 0;
             _oppMe = me;
             _oppBest = OppEval.Score(s, opp);
-            _oppBestMine = Eval.Score(s, me);
+            _oppBestMine = Leaf(s, me);
             _replyBest.CopyFrom(s);
             _oppBestLen = 0;
             OppDfs(0, opp);
             return _oppBestMine;
+        }
+
+        /// <summary>Оценка листа: терминал — ±WinScore, иначе сеть (если включена) или линейная оценка.</summary>
+        public double Leaf(GameState s, int me)
+        {
+            if (s.IsOver || !UseNet || !NetEval.Available) return Eval.Score(s, me);
+            double net = NetScale * _net.Logit(s, me);
+            return NetAdditive ? Eval.Score(s, me) + net : net;
         }
 
         /// <summary>Предсказанные атаки противника (линия лучшего для него ответа по OppEval) после моего хода.</summary>
@@ -629,7 +645,7 @@ namespace Locm
                 if (v > _oppBest)
                 {
                     _oppBest = v;
-                    _oppBestMine = Eval.Score(child, _oppMe);   // итог всегда моей оценкой
+                    _oppBestMine = Leaf(child, _oppMe);   // итог всегда моей оценкой (листовой)
                     _replyBest.CopyFrom(child);
                     _oppBestLen = depth + 1;
                     Array.Copy(_oppLine, _oppBestLine, _oppBestLen);
