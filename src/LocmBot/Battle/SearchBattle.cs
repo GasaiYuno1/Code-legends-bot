@@ -72,7 +72,16 @@ namespace Locm
         /// <summary>Бюджет прогрева JIT на первом ходу драфта, мс (0 — без прогрева; для быстрых локальных матчей).</summary>
         public int WarmUpMs = 400;
         /// <summary>Сколько лучших кандидатов после глубокого ответа оценить ещё и моим следующим ходом (3 полухода); 0 — выключено.</summary>
-        public int CounterCandidates = 0;   // 8: совпадение с Legend 55.4% → 47.4%, self-play 16:14, до 94 мс — выключено (эффект горизонта: на листьях моего хода нет ответа противника)
+        public int CounterCandidates = 0;
+        /// <summary>4-й полуход: сколько лучших по статике листьев моего второго хода переоценить его ответом (0 — старый 3-полуходовый режим со статикой).</summary>
+        public int CounterLeaves = 8;
+        /// <summary>Ответ на 4-м полуходе: полный перебор его атак (true) или жадный (false).</summary>
+        public bool CounterDeep = false;
+        /// <summary>Мой второй ход — только атаки (симметрично с моделью его хода: карты никто не играет).</summary>
+        public bool CounterAttacksOnly = false;
+        private readonly GameState[] _cLeafStates = new GameState[16];
+        private readonly double[] _cLeafScores = new double[16];
+        private int _cLeafCount;   // 8: совпадение с Legend 55.4% → 47.4%, self-play 16:14, до 94 мс — выключено (эффект горизонта: на листьях моего хода нет ответа противника)
         /// <summary>Лимит узлов перебора моего следующего хода на одного кандидата.</summary>
         public int CounterNodes = 1500;
 
@@ -164,6 +173,7 @@ namespace Locm
                 _oppLegal[i] = new List<GameAction>(64);
             }
             for (int i = 0; i < _cPool.Length; i++) _cPool[i] = new GameState();
+            for (int i = 0; i < _cLeafStates.Length; i++) _cLeafStates[i] = new GameState();
             for (int i = 0; i < _cLegal.Length; i++) _cLegal[i] = new List<GameAction>(64);
         }
 
@@ -1047,8 +1057,36 @@ namespace Locm
             _cNodes = 0;
             _cRootBoard = s.Me.BoardCount;
             _cBest = Eval.Score(s, me);
+            _cLeafCount = 0;
+            if (CounterLeaves > 0) AddCounterLeaf(s, _cBest);
             CounterDfs(0, ActionType.Pass, me);
-            return _cBest;
+            if (CounterLeaves == 0) return _cBest;
+            // 4-й полуход: лучшие по статике листья моего второго хода переоцениваются его ответом (чётная глубина — без эффекта горизонта)
+            double best = double.NegativeInfinity;
+            for (int i = 0; i < _cLeafCount; i++)
+            {
+                var leaf = _cLeafStates[i];
+                double v = leaf.IsOver ? Eval.Score(leaf, me) : (CounterDeep ? DeepReplyScore(leaf, me) : ReplyScore(leaf, me));
+                if (v > best) best = v;
+            }
+            return best;
+        }
+
+        /// <summary>Лист моего второго хода в набор лучших по статике (небольшой массив, вытесняется худший).</summary>
+        private void AddCounterLeaf(GameState state, double score)
+        {
+            int cap = Math.Min(CounterLeaves, _cLeafStates.Length);
+            if (_cLeafCount < cap)
+            {
+                _cLeafStates[_cLeafCount].CopyFrom(state);
+                _cLeafScores[_cLeafCount++] = score;
+                return;
+            }
+            int worst = 0;
+            for (int i = 1; i < _cLeafCount; i++) if (_cLeafScores[i] < _cLeafScores[worst]) worst = i;
+            if (score <= _cLeafScores[worst]) return;
+            _cLeafStates[worst].CopyFrom(state);
+            _cLeafScores[worst] = score;
         }
 
         private void CounterDfs(int depth, ActionType last, int me)
@@ -1062,6 +1100,7 @@ namespace Locm
             {
                 GameAction a = legal[i];
                 if (a.IsPass || !CounterAllowed(last, a.Type, s)) continue;
+                if (CounterAttacksOnly && a.Type != ActionType.Attack) continue;
                 if (_cNodes >= CounterNodes) return;
                 child.CopyFrom(s);
                 child.Apply(a);
@@ -1069,6 +1108,7 @@ namespace Locm
                 if (!_cVisited.Add(child.Hash())) continue;
                 double v = Eval.Score(child, me);
                 if (v > _cBest) _cBest = v;
+                if (CounterLeaves > 0) AddCounterLeaf(child, v);
                 if (child.IsOver)
                 {
                     if (child.Winner == me) { _cNodes = CounterNodes; return; }
