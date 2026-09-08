@@ -7,7 +7,7 @@ namespace Locm
     /// <summary>
     /// Локальный тюнинг: строки вида key=value переопределяют веса оценки и поиска (на CodinGame аргументов нет).
     /// Ключи: hp, lowhp, lowhpat, atk, def, guard, guarddef, ward, wardatk, lethal, drain, hand, oppdraw, mydraw,
-    /// reply, cand, table (0 — формульный рейтинг драфта).
+    /// handrating, reply, cand, table (0 — формульный рейтинг драфта).
     /// </summary>
     public static class Tuning
     {
@@ -35,6 +35,7 @@ namespace Locm
                     case "lethal": e.LethalW = v; break;
                     case "drain": e.DrainAtkW = v; break;
                     case "hand": e.HandCardW = v; break;
+                    case "handrating": e.HandRatingW = v; break;
                     case "oppdraw": e.OppDrawW = v; break;
                     case "mydraw": e.MyDrawW = v; break;
                     case "reply": search.ReplyWeight = v; break;

@@ -21,10 +21,11 @@ namespace Locm
         public double DrainAtkW = 0.3;
         public double BreakthroughAtkW = 0.15;
         public double ChargeW = 0.2;
-        public double HpW = 0.4;             // за 1 HP
+        public double HpW = 0.1;             // за 1 HP (0.4 давало 44% совпадения с ходами Legend, 0.1 — 49%)
         public double LowHpW = 0.8;          // дополнительно за 1 HP ниже LowHp
         public int LowHp = 10;
-        public double HandCardW = 1.0;       // карта в руке (не разыгранная) — небольшая ценность
+        public double HandCardW = 1.0;       // карта в руке (не разыгранная) — базовая ценность
+        public double HandRatingW = 0.0;     // плюс доля рейтинга карты (CardRating): сильные карты и removal держать дороже
         public double OppDrawW = 1.5;        // каждая лишняя карта противника за пробитые руны
         public double MyDrawW = 1.2;         // мой лишний добор (эффекты карт)
 
@@ -49,6 +50,14 @@ namespace Locm
             return v;
         }
 
+        public double Hand(PlayerState p)
+        {
+            double v = p.HandCount * HandCardW;
+            if (HandRatingW != 0)
+                for (int i = 0; i < p.HandKnown; i++) v += HandRatingW * CardRating.Rate(p.Hand[i]);
+            return v;
+        }
+
         public double Score(GameState s, int me)
         {
             if (s.IsOver) return s.Winner == me ? WinScore : -WinScore;
@@ -58,7 +67,7 @@ namespace Locm
             for (int i = 0; i < p.BoardCount; i++) v += Creature(in p.Board[i]);
             for (int i = 0; i < o.BoardCount; i++) v -= Creature(in o.Board[i]);
             v += Health(p.Health) - Health(o.Health);
-            v += p.HandCount * HandCardW - o.HandCount * HandCardW;
+            v += Hand(p) - Hand(o);
             v -= Math.Max(0, o.NextTurnDraw - 1) * OppDrawW;
             v += Math.Max(0, p.NextTurnDraw - 1) * MyDrawW;
             return v;

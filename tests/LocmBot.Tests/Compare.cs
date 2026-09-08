@@ -13,6 +13,9 @@ namespace Locm.Tests
     {
         public static int Run(string[] paths, int ms, string[] overrides) => Run(paths, ms, overrides, int.MaxValue, 1);
 
+        /// <summary>Сколько примеров расхождений печатать (позиция, их ход, мой ход, оценки).</summary>
+        public static int DumpExamples = 0;
+
         /// <param name="limit">не больше стольких ходов;</param>
         /// <param name="step">брать каждый step-й ход (равномерная выборка по всем файлам).</param>
         public static int Run(string[] paths, int ms, string[] overrides, int limit, int step)
@@ -29,7 +32,7 @@ namespace Locm.Tests
             }
             files.Sort(StringComparer.Ordinal);
 
-            int seen = 0;
+            int seen = 0, dumped = 0;
             foreach (var f in files)
             {
                 if (turns >= limit) break;
@@ -58,6 +61,14 @@ namespace Locm.Tests
                     if (Math.Abs(diff) < Evaluator.WinScore / 2) sumDiff += diff;
                     if (diff > 0.5) mineBetter++;
                     else if (diff < -0.5) theirsBetter++;
+                    if (diff > 0.5 && dumped < DumpExamples)
+                    {
+                        dumped++;
+                        Console.WriteLine($"==== {Path.GetFileName(f)} turn {turns}: my {scoreMine:F2} vs their {scoreTheirs:F2}");
+                        Console.Write(s.ToString());
+                        Console.WriteLine("   their: " + t.Answer);
+                        Console.WriteLine("   mine:  " + GameAction.Format(mine));
+                    }
                 }
             }
 

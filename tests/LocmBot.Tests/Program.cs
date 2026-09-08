@@ -22,6 +22,7 @@ namespace Locm.Tests
                     if (int.TryParse(args[i], out v)) ms = v;
                     else if (args[i].StartsWith("limit=")) limit = int.Parse(args[i].Substring(6));
                     else if (args[i].StartsWith("step=")) step = int.Parse(args[i].Substring(5));
+                    else if (args[i].StartsWith("dump=")) Compare.DumpExamples = int.Parse(args[i].Substring(5));
                     else if (args[i].Contains("=")) overrides.Add(args[i]);
                     else paths.Add(args[i]);
                 }
