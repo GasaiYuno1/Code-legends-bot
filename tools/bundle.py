@@ -4,8 +4,8 @@
 Правила, на которые опирается склейка:
   * каждый файл использует блочный `namespace Locm { ... }` (не file-scoped);
   * все `using` стоят в начале файла — они собираются и выносятся наверх без дублей;
-  * комментарии (строки с `//`, `///` и хвостовые `// ...`) выбрасываются ради лимита размера CodinGame;
-    в результате не должно остаться не-ASCII символов (проверяется).
+  * комментарии (строки с `//`, `///` и хвостовые `// ...`), отступы и пустые строки выбрасываются ради
+    лимита размера CodinGame (~100k символов); в результате не должно остаться не-ASCII символов (проверяется).
 
 Запуск: python3 tools/bundle.py  ->  dist/codingame.cs (файл отслеживается git — пересобирать перед пушем)
 """
@@ -67,8 +67,9 @@ def main() -> int:
             elif COMMENT_LINE_RE.match(line):
                 continue
             else:
-                line = strip_trailing_comment(line)
-                if line.strip() or (body_lines and body_lines[-1].strip()):
+                # отступы и пустые строки в C# не значимы — выбрасываем ради лимита размера
+                line = strip_trailing_comment(line).strip()
+                if line:
                     body_lines.append(line)
         rel = path.relative_to(ROOT).as_posix()
         bodies.append(f"// ===== {rel} =====\n" + "\n".join(body_lines).strip("\n") + "\n")
