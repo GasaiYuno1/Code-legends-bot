@@ -21,7 +21,10 @@ public double LethalW = 1.5;
 public double DrainAtkW = 0.3;
 public double BreakthroughAtkW = 0.15;
 public double ChargeW = 0.2;
-public double HpW = 0.1;
+public double Fragile1W = 0.0;
+public double Fragile2W = 0.0;
+public double BlueHandW = 0.0;
+public double HpW = 0.3;
 public double LowHpW = 0.8;
 public int LowHp = 10;
 public double HandCardW = 1.0;
@@ -38,6 +41,8 @@ if ((a & Abilities.Lethal) != 0) v += LethalW;
 if ((a & Abilities.Drain) != 0) v += c.Attack * DrainAtkW;
 if ((a & Abilities.Breakthrough) != 0) v += c.Attack * BreakthroughAtkW;
 if ((a & Abilities.Charge) != 0) v += ChargeW;
+if (c.Defense <= 1) v -= Fragile1W;
+else if (c.Defense == 2) v -= Fragile2W;
 return v;
 }
 public double Health(int hp)
@@ -50,8 +55,14 @@ return v;
 public double Hand(PlayerState p)
 {
 double v = p.HandCount * HandCardW;
-if (HandRatingW != 0)
-for (int i = 0; i < p.HandKnown; i++) v += HandRatingW * CardRating.Rate(p.Hand[i]);
+if (HandRatingW != 0 || BlueHandW != 0)
+{
+for (int i = 0; i < p.HandKnown; i++)
+{
+if (HandRatingW != 0) v += HandRatingW * CardRating.Rate(p.Hand[i]);
+if (BlueHandW != 0 && p.Hand[i].Type == CardType.BlueItem && p.Hand[i].Defense < 0) v += BlueHandW;
+}
+}
 return v;
 }
 public double Score(GameState s, int me)
@@ -2117,6 +2128,9 @@ case "lethal": e.LethalW = v; break;
 case "drain": e.DrainAtkW = v; break;
 case "hand": e.HandCardW = v; break;
 case "handrating": e.HandRatingW = v; break;
+case "fragile1": e.Fragile1W = v; break;
+case "fragile2": e.Fragile2W = v; break;
+case "blue": e.BlueHandW = v; break;
 case "oppdraw": e.OppDrawW = v; break;
 case "mydraw": e.MyDrawW = v; break;
 case "reply": search.ReplyWeight = v; break;

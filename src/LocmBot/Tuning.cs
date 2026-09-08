@@ -49,6 +49,9 @@ namespace Locm
                     case "drain": e.DrainAtkW = v; break;
                     case "hand": e.HandCardW = v; break;
                     case "handrating": e.HandRatingW = v; break;
+                    case "fragile1": e.Fragile1W = v; break;
+                    case "fragile2": e.Fragile2W = v; break;
+                    case "blue": e.BlueHandW = v; break;
                     case "oppdraw": e.OppDrawW = v; break;
                     case "mydraw": e.MyDrawW = v; break;
                     case "reply": search.ReplyWeight = v; break;

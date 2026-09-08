@@ -21,7 +21,10 @@ namespace Locm
         public double DrainAtkW = 0.3;
         public double BreakthroughAtkW = 0.15;
         public double ChargeW = 0.2;
-        public double HpW = 0.1;             // за 1 HP (0.4 давало 44% совпадения с ходами Legend, 0.1 — 49%)
+        public double Fragile1W = 0.0;       // штраф существу с защитой 1 (умирает от чего угодно)
+        public double Fragile2W = 0.0;       // штраф существу с защитой 2
+        public double BlueHandW = 0.0;       // синий предмет с уроном в руке — запас на летал
+        public double HpW = 0.3;             // за 1 HP; совпадение с ходами Legend на 4000 позиций (с глубоким ответом): 0.1 → 54.0%, 0.3 → 55.4%, 0.4 → 54.1%
         public double LowHpW = 0.8;          // дополнительно за 1 HP ниже LowHp
         public int LowHp = 10;
         public double HandCardW = 1.0;       // карта в руке (не разыгранная) — базовая ценность
@@ -39,6 +42,8 @@ namespace Locm
             if ((a & Abilities.Drain) != 0) v += c.Attack * DrainAtkW;
             if ((a & Abilities.Breakthrough) != 0) v += c.Attack * BreakthroughAtkW;
             if ((a & Abilities.Charge) != 0) v += ChargeW;
+            if (c.Defense <= 1) v -= Fragile1W;
+            else if (c.Defense == 2) v -= Fragile2W;
             return v;
         }
 
@@ -53,8 +58,14 @@ namespace Locm
         public double Hand(PlayerState p)
         {
             double v = p.HandCount * HandCardW;
-            if (HandRatingW != 0)
-                for (int i = 0; i < p.HandKnown; i++) v += HandRatingW * CardRating.Rate(p.Hand[i]);
+            if (HandRatingW != 0 || BlueHandW != 0)
+            {
+                for (int i = 0; i < p.HandKnown; i++)
+                {
+                    if (HandRatingW != 0) v += HandRatingW * CardRating.Rate(p.Hand[i]);
+                    if (BlueHandW != 0 && p.Hand[i].Type == CardType.BlueItem && p.Hand[i].Defense < 0) v += BlueHandW;
+                }
+            }
             return v;
         }
 
