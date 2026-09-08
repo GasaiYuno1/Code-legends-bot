@@ -27,6 +27,8 @@ namespace Locm
         public double HpW = 0.3;             // за 1 HP; совпадение с ходами Legend на 4000 позиций (с глубоким ответом): 0.1 → 54.0%, 0.3 → 55.4%, 0.4 → 54.1%
         public double LowHpW = 0.8;          // дополнительно за 1 HP ниже LowHp
         public int LowHp = 10;
+        public double MidHpW = 0.0;          // дополнительно за 1 HP ниже MidHp (зона, где начинается гонка)
+        public int MidHp = 20;
         public double HandCardW = 1.0;       // карта в руке (не разыгранная) — базовая ценность
         public double HandRatingW = 0.0;     // плюс доля рейтинга карты (CardRating): сильные карты и removal держать дороже
         public double OppDrawW = 1.5;        // каждая лишняя карта противника за пробитые руны
@@ -51,6 +53,7 @@ namespace Locm
         {
             if (hp <= 0) return -WinScore;
             double v = hp * HpW;
+            if (hp < MidHp) v -= (MidHp - hp) * MidHpW;
             if (hp < LowHp) v -= (LowHp - hp) * LowHpW;
             return v;
         }

@@ -10,6 +10,8 @@ namespace Locm.Tests
         {
             if (args.Length > 0 && args[0] == "replay")
                 return ReplayMain(args);
+            if (args.Length > 0 && args[0] == "bench")
+                return Bench.Run(args.Length > 1 ? args[1] : Replay.FixturesDir(), args.Length > 2 ? int.Parse(args[2]) : 30, args.Length > 3 ? int.Parse(args[3]) : 300);
             if (args.Length > 0 && args[0] == "replycheck")
             {
                 // replycheck <логи> [limit=N] [step=K] [key=value | o_key=value]
@@ -51,6 +53,7 @@ namespace Locm.Tests
                     else if (args[i].StartsWith("limit=")) limit = int.Parse(args[i].Substring(6));
                     else if (args[i].StartsWith("step=")) step = int.Parse(args[i].Substring(5));
                     else if (args[i].StartsWith("dump=")) Compare.DumpExamples = int.Parse(args[i].Substring(5));
+                    else if (args[i] == "dumplethal") Compare.DumpLethalOnly = true;
                     else if (args[i].Contains("=")) overrides.Add(args[i]);
                     else paths.Add(args[i]);
                 }

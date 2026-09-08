@@ -46,6 +46,8 @@ namespace Locm
                     case "hp": e.HpW = v; break;
                     case "lowhp": e.LowHpW = v; break;
                     case "lowhpat": e.LowHp = (int)v; break;
+                    case "midhp": e.MidHpW = v; break;
+                    case "midhpat": e.MidHp = (int)v; break;
                     case "atk": e.AttackW = v; break;
                     case "def": e.DefenseW = v; break;
                     case "guard": e.GuardW = v; break;
@@ -89,7 +91,7 @@ namespace Locm
             {
                 AttackW = e.AttackW, DefenseW = e.DefenseW, GuardW = e.GuardW, GuardDefW = e.GuardDefW, WardW = e.WardW, WardAtkW = e.WardAtkW,
                 LethalW = e.LethalW, DrainAtkW = e.DrainAtkW, BreakthroughAtkW = e.BreakthroughAtkW, ChargeW = e.ChargeW,
-                Fragile1W = e.Fragile1W, Fragile2W = e.Fragile2W, BlueHandW = e.BlueHandW, HpW = e.HpW, LowHpW = e.LowHpW, LowHp = e.LowHp,
+                Fragile1W = e.Fragile1W, Fragile2W = e.Fragile2W, BlueHandW = e.BlueHandW, HpW = e.HpW, LowHpW = e.LowHpW, LowHp = e.LowHp, MidHpW = e.MidHpW, MidHp = e.MidHp,
                 HandCardW = e.HandCardW, HandRatingW = e.HandRatingW, OppDrawW = e.OppDrawW, MyDrawW = e.MyDrawW,
             };
         }

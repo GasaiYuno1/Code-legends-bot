@@ -15,6 +15,8 @@ namespace Locm.Tests
 
         /// <summary>Сколько примеров расхождений печатать (позиция, их ход, мой ход, оценки).</summary>
         public static int DumpExamples = 0;
+        /// <summary>Печатать только случаи «мой ход выигрывает, их — нет» (проверка, что леталы настоящие).</summary>
+        public static bool DumpLethalOnly = false;
 
         /// <param name="limit">не больше стольких ходов;</param>
         /// <param name="step">брать каждый step-й ход (равномерная выборка по всем файлам).</param>
@@ -61,7 +63,8 @@ namespace Locm.Tests
                     if (Math.Abs(diff) < Evaluator.WinScore / 2) sumDiff += diff;
                     if (diff > 0.5) mineBetter++;
                     else if (diff < -0.5) theirsBetter++;
-                    if (diff > 0.5 && dumped < DumpExamples)
+                    bool lethalCase = afterMine.Winner == 0 && afterTheirs.Winner != 0;
+                    if (dumped < DumpExamples && (DumpLethalOnly ? lethalCase : diff > 0.5))
                     {
                         dumped++;
                         Console.WriteLine($"==== {Path.GetFileName(f)} turn {turns}: my {scoreMine:F2} vs their {scoreTheirs:F2}");
