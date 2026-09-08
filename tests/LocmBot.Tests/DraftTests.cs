@@ -13,10 +13,30 @@ namespace Locm.Tests
             return t;
         }
 
+        /// <summary>Тесты формулы гоняются с выключенной таблицей.</summary>
+        private static RatingDraft FormulaDraft()
+        {
+            CardRating.UseTable = false;
+            return new RatingDraft();
+        }
+
+        [Test]
+        public static void Table_CoversAllCardsAndRanksKnownStrongCardsHigh()
+        {
+            CardRating.UseTable = true;
+            Assert.Equal(CardDb.Count + 1, CardTable.Rating.Length);
+            Assert.True(CardTable.Picks > 0);
+            // Acid Golem и Decimate — общепризнанные топы контеста; Wurm 0/1 за 1 — низ
+            Assert.True(CardRating.Rate(CardDb.Get(18)) > CardRating.Rate(CardDb.Get(92)), "Acid Golem > Wurm");
+            Assert.True(CardRating.Rate(CardDb.Get(151)) > 0, "Decimate above average");
+            var d = new RatingDraft();
+            Assert.Equal(0, d.Pick(Triple(18, 92, 92), new System.Collections.Generic.List<Card>()));
+        }
+
         [Test]
         public static void PicksHigherRatedCard()
         {
-            var d = new RatingDraft();
+            var d = FormulaDraft();
             // Acid Golem 7/4 за 4 против Plated Toad 1/5 за 2 и Wurm 0/1 G за 1
             Assert.Equal(0, d.Pick(Triple(18, 4, 92), new List<Card>()));
             Assert.Equal(2, d.Pick(Triple(92, 4, 18), new List<Card>()));
@@ -25,7 +45,7 @@ namespace Locm.Tests
         [Test]
         public static void ManaCurve_ShiftsPickTowardsMissingCosts()
         {
-            var d = new RatingDraft();
+            var d = FormulaDraft();
             var picked = new List<Card>();
             var triple = Triple(7, 19, 19);   // Rootkin Sapling 2/2 W (2) против Foulbeast 5/6 (5)
             Assert.Equal(0, d.Pick(triple, picked), "empty deck: cheap ward creature first");
@@ -36,7 +56,7 @@ namespace Locm.Tests
         [Test]
         public static void ItemLimit_PrefersCreatureAfterManyItems()
         {
-            var d = new RatingDraft();
+            var d = FormulaDraft();
             var picked = new List<Card>();
             var triple = Triple(151, 9, 9);   // Decimate против Corrupted Beavrat 3/4
             Assert.Equal(0, d.Pick(triple, picked));
@@ -47,6 +67,7 @@ namespace Locm.Tests
         [Test]
         public static void RatingsAreSane()
         {
+            CardRating.UseTable = false;
             double sum = 0;
             int n = 0;
             for (int id = 1; id <= CardDb.Count; id++)

@@ -8,6 +8,9 @@ namespace Locm
     /// </summary>
     public static class CardRating
     {
+        /// <summary>Брать рейтинг из таблицы пиков Legend-игроков (CardTable, вариант D3); false — формула ниже (D1).</summary>
+        public static bool UseTable = true;
+
         public static double AttackW = 1.0;
         public static double DefenseW = 1.0;
         public static double BodyW = 0.06;         // бонус за «большое тело»: atk*def — 7/4 сильнее двух 3/2
@@ -57,6 +60,14 @@ namespace Locm
         }
 
         public static double Rate(Card c)
+        {
+            if (UseTable && CardTable.Picks > 0 && c.Number > 0 && c.Number < CardTable.Rating.Length)
+                return CardTable.Rating[c.Number];
+            return Formula(c);
+        }
+
+        /// <summary>Формульный рейтинг (D1): статы, способности, эффекты минус норма для стоимости.</summary>
+        public static double Formula(Card c)
         {
             switch (c.Type)
             {
