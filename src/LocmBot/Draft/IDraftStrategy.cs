@@ -29,11 +29,15 @@ namespace Locm
         public static double ItemOverPenalty = 3.0;
         public static int MaxSameCard = 2;          // третья копия одной карты — штраф
         public static double SameCardPenalty = 0.0; // Legend третью копию не избегает: со штрафом 1.5 совпадение с их пиками падает на 2%
+        /// <summary>Разведка для статистики из self-play: с этой вероятностью пик случайный (0 — выключено).</summary>
+        public static double Explore = 0.0;
+        private static readonly Random _rng = new Random();
 
         private readonly int[] _curve = new int[8];
 
         public int Pick(TurnInput input, IReadOnlyList<Card> alreadyPicked)
         {
+            if (Explore > 0 && _rng.NextDouble() < Explore) return _rng.Next(Math.Min(3, input.Cards.Count));
             Array.Clear(_curve, 0, _curve.Length);
             int items = 0;
             foreach (var c in alreadyPicked)

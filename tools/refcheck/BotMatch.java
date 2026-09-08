@@ -111,13 +111,22 @@ public class BotMatch {
             stats[0].games++;
             stats[1].games++;
             System.out.println("game " + (g + 1) + " seed " + gs + ": bot " + (winnerBot == 0 ? "A" : "B") + " (player " + winner + ") won");
+            for (int p = 0; p < 2; p++) {
+                StringBuilder sb = new StringBuilder("picks" + p + " bot " + (side[0] == p ? "A" : "B") + " won " + (winner == p ? 1 : 0) + " :");
+                for (int t = 0; t < Constants.CARDS_IN_DECK; t++) sb.append(' ').append(lastPicks[p][t]);
+                System.out.println(sb);
+            }
         }
         System.out.println("A: " + stats[0]);
         System.out.println("B: " + stats[1]);
     }
 
+    /** Пики последней партии: [игрок][ход драфта] = baseId (0 — нет). */
+    static int[][] lastPicks = new int[2][Constants.CARDS_IN_DECK];
+
     /** Возвращает индекс победителя (0/1). */
     static int playGame(long seed, String[] cmds, Stats[] stats, File logDir) throws Exception {
+        for (int p = 0; p < 2; p++) java.util.Arrays.fill(lastPicks[p], 0);
         Random rng = new Random(seed);
         RefereeParams params = new RefereeParams(rng.nextLong(), rng.nextLong(), rng.nextLong());
         DraftPhase draft = new DraftPhase(DraftPhase.Difficulty.NORMAL, params);
@@ -146,8 +155,15 @@ public class BotMatch {
                     }
                     try {
                         draft.PlayerChoice(t, ans, p);
+                        String[] parts = ans.trim().split("\\s+");
+                        if (parts.length >= 2 && parts[0].equals("PICK")) {
+                            int idx = Integer.parseInt(parts[1]);
+                            if (idx >= 0 && idx < 3) lastPicks[p][t] = draft.draft[t][idx].baseId;
+                        }
                     } catch (InvalidActionHard e) {
                         loser = p;
+                    } catch (NumberFormatException e) {
+                        // пик уже принят арбитром; для статистики оставляем 0
                     }
                     for (String l : lines) logs[p].append(l).append('\n');
                     logs[p].append("> ").append(ans).append('\n');

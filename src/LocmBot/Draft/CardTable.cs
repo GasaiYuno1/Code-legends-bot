@@ -15,7 +15,11 @@ namespace Locm
         /// <summary>true — таблица с поправкой на винрейт колод (что выигрывает), false — чистые пики (что берут).</summary>
         public static bool UseWinAdjusted = false;
 
+        /// <summary>Поправка из self-play (tools/arena/selfplay_cards.py): логит-вклад карты в победу колоды, сотые доли; пусто — нули.</summary>
+        private const string PackedSelf = "";
+
         public static double[] Rating => UseWinAdjusted ? _win : _pick;
+        public static readonly double[] SelfPlay = PackedSelf.Length == 0 ? new double[Unpack(Packed).Length] : Unpack(PackedSelf);
         private static readonly double[] _pick = Unpack(Packed);
         private static readonly double[] _win = Unpack(PackedWin);
 

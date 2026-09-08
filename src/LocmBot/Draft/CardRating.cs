@@ -59,10 +59,13 @@ namespace Locm
             return v;
         }
 
+        /// <summary>Вес поправки из self-play (CardTable.SelfPlay: вклад карты в винрейт колоды); 0 — только таблица пиков.</summary>
+        public static double SelfW = 0.0;
+
         public static double Rate(Card c)
         {
             if (UseTable && CardTable.Picks > 0 && c.Number > 0 && c.Number < CardTable.Rating.Length)
-                return CardTable.Rating[c.Number];
+                return CardTable.Rating[c.Number] + (SelfW != 0 && c.Number < CardTable.SelfPlay.Length ? SelfW * CardTable.SelfPlay[c.Number] : 0.0);
             return Formula(c);
         }
 

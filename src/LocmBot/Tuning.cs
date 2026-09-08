@@ -90,6 +90,8 @@ namespace Locm
                     case "maxitems": RatingDraft.MaxItems = (int)v; break;
                     case "itempenalty": RatingDraft.ItemOverPenalty = v; break;
                     case "samecard": RatingDraft.SameCardPenalty = v; break;
+                    case "draftexplore": RatingDraft.Explore = v; break;
+                    case "selfw": CardRating.SelfW = v; break;
                     default:
                         if (log != null) log.WriteLine("unknown override: " + arg);
                         continue;
