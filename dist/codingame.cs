@@ -118,6 +118,8 @@ namespace Locm
         public double ReplyWeight = 0.75;
         public int MaxCandidates = 1024;
         public double Phase1Share = 0.6;
+        public int DeepReplyCandidates = 32;
+        public int DeepReplyNodes = 400;
 
         private readonly GameState[] _pool = new GameState[MaxDepth + 2];
         private readonly List<GameAction>[] _legal = new List<GameAction>[MaxDepth + 1];
@@ -130,6 +132,14 @@ namespace Locm
         private int _heapCount;
         private readonly GameState _scratch = new GameState();
         private readonly GameState _tmp = new GameState();
+        private readonly GameState[] _oppPool = new GameState[GameState.MaxBoard + 2];
+        private readonly List<GameAction>[] _oppLegal = new List<GameAction>[GameState.MaxBoard + 2];
+        private readonly HashSet<ulong> _oppVisited = new HashSet<ulong>();
+        private readonly double[] _final = new double[4096];
+        private int _oppNodes;
+        private double _oppBest;
+        private double _oppBestMine;
+        private int _oppMe;
         private readonly int[] _order = new int[GameState.MaxBoard];
         private readonly int[] _ids = new int[GameState.MaxBoard];
         private int _bestLen;
@@ -147,6 +157,8 @@ namespace Locm
         public long Nodes => _nodes;
         public int Candidates { get; private set; }
         public int Rescored { get; private set; }
+        public int DeepRescored { get; private set; }
+        private readonly int[] _order2 = new int[4096];
         public double BestScore => _best;
         public bool TimedOut { get; private set; }
 
@@ -160,6 +172,11 @@ namespace Locm
             {
                 _legal[i] = new List<GameAction>(64);
                 _children[i] = new Child[128];
+            }
+            for (int i = 0; i < _oppPool.Length; i++)
+            {
+                _oppPool[i] = new GameState();
+                _oppLegal[i] = new List<GameAction>(64);
             }
         }
 
@@ -197,6 +214,7 @@ namespace Locm
             _nodes = 0;
             _heapCount = 0;
             Rescored = 0;
+            DeepRescored = 0;
             _visited.Clear();
             if (!ReferenceEquals(root, _pool[0])) _pool[0].CopyFrom(root);
             int me = _pool[0].Current;
@@ -377,6 +395,7 @@ namespace Locm
 
             double bestFinal = double.NegativeInfinity;
             int bestIdx = -1;
+            int scored = 0;
             for (int i = 0; i < n; i++)
             {
                 if ((i & 7) == 7 && _clock.TimeUp)
@@ -387,6 +406,8 @@ namespace Locm
                 Candidate c = _heap[i];
                 double reply = ReplyScore(c.State, me);
                 double final = ReplyWeight * reply + (1 - ReplyWeight) * c.Static;
+                if (i < _final.Length) _final[i] = final;
+                scored = i + 1;
                 Rescored++;
                 if (final > bestFinal)
                 {
@@ -395,6 +416,36 @@ namespace Locm
                 }
             }
             if (bestIdx < 0) return;
+
+            if (DeepReplyCandidates > 0 && !_clock.TimeUp)
+            {
+                int m = Math.Min(scored, Math.Min(DeepReplyCandidates, _final.Length));
+                var order = _order2;
+                for (int i = 0; i < scored && i < order.Length; i++) order[i] = i;
+                int total = Math.Min(scored, order.Length);
+                for (int i = 0; i < m; i++)
+                {
+                    int best = i;
+                    for (int j = i + 1; j < total; j++) if (_final[order[j]] > _final[order[best]]) best = j;
+                    int t = order[i]; order[i] = order[best]; order[best] = t;
+                }
+                bestFinal = double.NegativeInfinity;
+                bestIdx = -1;
+                for (int i = 0; i < m; i++)
+                {
+                    if (_clock.TimeUp) { TimedOut = true; break; }
+                    Candidate c = _heap[order[i]];
+                    double deep = DeepReplyScore(c.State, me);
+                    double final = ReplyWeight * deep + (1 - ReplyWeight) * c.Static;
+                    DeepRescored++;
+                    if (final > bestFinal)
+                    {
+                        bestFinal = final;
+                        bestIdx = order[i];
+                    }
+                }
+                if (bestIdx < 0) return;
+            }
             Candidate b = _heap[bestIdx];
             _best = bestFinal;
             _bestLen = b.Length;
@@ -461,6 +512,51 @@ namespace Locm
                 if (bestTarget != int.MinValue) s.Apply(GameAction.Attack(id, bestTarget));
             }
             return Eval.Score(s, me);
+        }
+
+        public double DeepReplyScore(GameState after, int me)
+        {
+            if (after.IsOver) return Eval.Score(after, me);
+            var s = _oppPool[0];
+            s.CopyFrom(after);
+            s.EndTurn();
+            if (s.IsOver) return Eval.Score(s, me);
+            int opp = s.Current;
+            _oppVisited.Clear();
+            _oppVisited.Add(s.Hash());
+            _oppNodes = 0;
+            _oppMe = me;
+            _oppBest = Eval.Score(s, opp);
+            _oppBestMine = Eval.Score(s, me);
+            OppDfs(0, opp);
+            return _oppBestMine;
+        }
+
+        private void OppDfs(int depth, int opp)
+        {
+            if (depth + 1 >= _oppPool.Length) return;
+            var s = _oppPool[depth];
+            var child = _oppPool[depth + 1];
+            var legal = _oppLegal[depth];
+            s.LegalActions(legal);
+            for (int i = 0; i < legal.Count; i++)
+            {
+                GameAction a = legal[i];
+                if (a.Type != ActionType.Attack) continue;
+                if (_oppNodes >= DeepReplyNodes) return;
+                child.CopyFrom(s);
+                child.Apply(a);
+                _oppNodes++;
+                if (!_oppVisited.Add(child.Hash())) continue;
+                double v = Eval.Score(child, opp);
+                if (v > _oppBest)
+                {
+                    _oppBest = v;
+                    _oppBestMine = Eval.Score(child, _oppMe);
+                }
+                if (child.IsOver) continue;
+                OppDfs(depth + 1, opp);
+            }
         }
 
         private double TryAttack(GameState s, int id, int target, int opp)
@@ -696,170 +792,17 @@ namespace Locm
         public const int Games = 1474;
         public const int Picks = 71010;
 
-        public static readonly double[] Rating =
+        private const string Packed = "-39,-207,161,-111,57,47,308,96,161,-271,123,72,19,-161,90,-118,118,269,166,-223,118,-79,216,-259,-66,62,-106,201,264,-28,-280,258,227,16,-216,35,242,-55,-34,-158,27,-252,-168,268,-111,-183,-66,290,296,239,299,242,293,220,-366,-118,-290,-122,13,-242,41,-41,-252,210,313,237,276,320,293,100,-102,-27,27,-74,129,-152,0,-285,-7,272,111,219,16,244,197,-18,179,169,-71,-20,-59,-375,3,-64,173,150,70,-15,188,-61,-121,-228,224,66,129,118,-252,-199,166,-461,133,27,-340,136,160,288,-296,-60,-89,-74,150,-25,-183,-291,-152,-12,-119,91,97,-206,-243,-208,162,33,75,-181,-74,-350,277,-341,87,-215,-418,120,63,-143,192,177,-87,151,298,159,-524,-488,35,-405,76,183,-114,-475";
+
+        public static readonly double[] Rating = Unpack();
+
+        private static double[] Unpack()
         {
-            0.0,
-            -0.388,
-            -2.069,
-            1.614,
-            -1.115,
-            0.573,
-            0.469,
-            3.080,
-            0.958,
-            1.605,
-            -2.711,
-            1.229,
-            0.722,
-            0.192,
-            -1.612,
-            0.904,
-            -1.179,
-            1.181,
-            2.685,
-            1.659,
-            -2.231,
-            1.184,
-            -0.789,
-            2.162,
-            -2.588,
-            -0.658,
-            0.616,
-            -1.064,
-            2.006,
-            2.638,
-            -0.276,
-            -2.797,
-            2.579,
-            2.266,
-            0.164,
-            -2.159,
-            0.346,
-            2.422,
-            -0.552,
-            -0.337,
-            -1.576,
-            0.272,
-            -2.522,
-            -1.681,
-            2.675,
-            -1.108,
-            -1.828,
-            -0.660,
-            2.903,
-            2.958,
-            2.389,
-            2.992,
-            2.418,
-            2.928,
-            2.199,
-            -3.665,
-            -1.177,
-            -2.897,
-            -1.221,
-            0.126,
-            -2.424,
-            0.409,
-            -0.406,
-            -2.521,
-            2.103,
-            3.126,
-            2.374,
-            2.764,
-            3.201,
-            2.930,
-            1.004,
-            -1.015,
-            -0.269,
-            0.272,
-            -0.742,
-            1.291,
-            -1.523,
-            -0.000,
-            -2.852,
-            -0.075,
-            2.721,
-            1.113,
-            2.192,
-            0.156,
-            2.442,
-            1.972,
-            -0.184,
-            1.790,
-            1.692,
-            -0.712,
-            -0.204,
-            -0.592,
-            -3.754,
-            0.033,
-            -0.639,
-            1.735,
-            1.503,
-            0.703,
-            -0.148,
-            1.884,
-            -0.610,
-            -1.206,
-            -2.284,
-            2.239,
-            0.663,
-            1.287,
-            1.183,
-            -2.522,
-            -1.989,
-            1.657,
-            -4.609,
-            1.331,
-            0.270,
-            -3.404,
-            1.363,
-            1.596,
-            2.877,
-            -2.960,
-            -0.602,
-            -0.886,
-            -0.739,
-            1.502,
-            -0.246,
-            -1.834,
-            -2.908,
-            -1.522,
-            -0.118,
-            -1.188,
-            0.912,
-            0.972,
-            -2.059,
-            -2.432,
-            -2.076,
-            1.623,
-            0.333,
-            0.753,
-            -1.813,
-            -0.736,
-            -3.501,
-            2.767,
-            -3.413,
-            0.871,
-            -2.147,
-            -4.184,
-            1.201,
-            0.630,
-            -1.430,
-            1.925,
-            1.773,
-            -0.869,
-            1.512,
-            2.982,
-            1.590,
-            -5.242,
-            -4.884,
-            0.347,
-            -4.051,
-            0.756,
-            1.830,
-            -1.137,
-            -4.751,
-        };
+            var parts = Packed.Split(',');
+            var r = new double[parts.Length + 1];
+            for (int i = 0; i < parts.Length; i++) r[i + 1] = int.Parse(parts[i]) / 100.0;
+            return r;
+        }
     }
 }
 
@@ -2376,6 +2319,8 @@ namespace Locm
                     case "mydraw": e.MyDrawW = v; break;
                     case "reply": search.ReplyWeight = v; break;
                     case "cand": search.MaxCandidates = (int)v; break;
+                    case "deep": search.DeepReplyCandidates = (int)v; break;
+                    case "deepnodes": search.DeepReplyNodes = (int)v; break;
                     case "table": CardRating.UseTable = v != 0; break;
                     case "curvew": RatingDraft.CurveW = v; break;
                     case "maxitems": RatingDraft.MaxItems = (int)v; break;

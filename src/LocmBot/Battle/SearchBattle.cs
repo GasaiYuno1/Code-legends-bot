@@ -38,6 +38,10 @@ namespace Locm
         public int MaxCandidates = 1024;
         /// <summary>Доля бюджета времени на этап 1.</summary>
         public double Phase1Share = 0.6;
+        /// <summary>Сколько лучших (после жадной переоценки) кандидатов переоценить полным перебором атак противника; 0 — выключено.</summary>
+        public int DeepReplyCandidates = 32;
+        /// <summary>Лимит узлов перебора атак противника на одного кандидата.</summary>
+        public int DeepReplyNodes = 400;
 
         private readonly GameState[] _pool = new GameState[MaxDepth + 2];
         private readonly List<GameAction>[] _legal = new List<GameAction>[MaxDepth + 1];
@@ -50,6 +54,14 @@ namespace Locm
         private int _heapCount;
         private readonly GameState _scratch = new GameState();
         private readonly GameState _tmp = new GameState();
+        private readonly GameState[] _oppPool = new GameState[GameState.MaxBoard + 2];
+        private readonly List<GameAction>[] _oppLegal = new List<GameAction>[GameState.MaxBoard + 2];
+        private readonly HashSet<ulong> _oppVisited = new HashSet<ulong>();
+        private readonly double[] _final = new double[4096];
+        private int _oppNodes;
+        private double _oppBest;
+        private double _oppBestMine;
+        private int _oppMe;
         private readonly int[] _order = new int[GameState.MaxBoard];
         private readonly int[] _ids = new int[GameState.MaxBoard];
         private int _bestLen;
@@ -68,6 +80,8 @@ namespace Locm
         public long Nodes => _nodes;
         public int Candidates { get; private set; }
         public int Rescored { get; private set; }
+        public int DeepRescored { get; private set; }
+        private readonly int[] _order2 = new int[4096];
         public double BestScore => _best;
         public bool TimedOut { get; private set; }
 
@@ -81,6 +95,11 @@ namespace Locm
             {
                 _legal[i] = new List<GameAction>(64);
                 _children[i] = new Child[128];
+            }
+            for (int i = 0; i < _oppPool.Length; i++)
+            {
+                _oppPool[i] = new GameState();
+                _oppLegal[i] = new List<GameAction>(64);
             }
         }
 
@@ -120,6 +139,7 @@ namespace Locm
             _nodes = 0;
             _heapCount = 0;
             Rescored = 0;
+            DeepRescored = 0;
             _visited.Clear();
             if (!ReferenceEquals(root, _pool[0])) _pool[0].CopyFrom(root);
             int me = _pool[0].Current;
@@ -309,6 +329,7 @@ namespace Locm
 
             double bestFinal = double.NegativeInfinity;
             int bestIdx = -1;
+            int scored = 0;
             for (int i = 0; i < n; i++)
             {
                 if ((i & 7) == 7 && _clock.TimeUp)
@@ -319,6 +340,8 @@ namespace Locm
                 Candidate c = _heap[i];
                 double reply = ReplyScore(c.State, me);
                 double final = ReplyWeight * reply + (1 - ReplyWeight) * c.Static;
+                if (i < _final.Length) _final[i] = final;
+                scored = i + 1;
                 Rescored++;
                 if (final > bestFinal)
                 {
@@ -327,6 +350,38 @@ namespace Locm
                 }
             }
             if (bestIdx < 0) return;   // ни одного не успели — остаётся лучшее по статике
+
+            // уровень 2: лучшие по жадной оценке переоцениваем полным перебором атак противника
+            if (DeepReplyCandidates > 0 && !_clock.TimeUp)
+            {
+                int m = Math.Min(scored, Math.Min(DeepReplyCandidates, _final.Length));
+                // индексы m лучших по _final (частичная сортировка выбором — m мало)
+                var order = _order2;
+                for (int i = 0; i < scored && i < order.Length; i++) order[i] = i;
+                int total = Math.Min(scored, order.Length);
+                for (int i = 0; i < m; i++)
+                {
+                    int best = i;
+                    for (int j = i + 1; j < total; j++) if (_final[order[j]] > _final[order[best]]) best = j;
+                    int t = order[i]; order[i] = order[best]; order[best] = t;
+                }
+                bestFinal = double.NegativeInfinity;
+                bestIdx = -1;
+                for (int i = 0; i < m; i++)
+                {
+                    if (_clock.TimeUp) { TimedOut = true; break; }
+                    Candidate c = _heap[order[i]];
+                    double deep = DeepReplyScore(c.State, me);
+                    double final = ReplyWeight * deep + (1 - ReplyWeight) * c.Static;
+                    DeepRescored++;
+                    if (final > bestFinal)
+                    {
+                        bestFinal = final;
+                        bestIdx = order[i];
+                    }
+                }
+                if (bestIdx < 0) return;
+            }
             Candidate b = _heap[bestIdx];
             _best = bestFinal;
             _bestLen = b.Length;
@@ -399,6 +454,55 @@ namespace Locm
                 if (bestTarget != int.MinValue) s.Apply(GameAction.Attack(id, bestTarget));
             }
             return Eval.Score(s, me);
+        }
+
+        /// <summary>
+        /// Оценка после лучшего для противника ответа атаками: полный перебор последовательностей его атак
+        /// (с дедупликацией по хешу и лимитом узлов), он может остановиться в любой момент. Карты его руки не учитываются.
+        /// </summary>
+        public double DeepReplyScore(GameState after, int me)
+        {
+            if (after.IsOver) return Eval.Score(after, me);
+            var s = _oppPool[0];
+            s.CopyFrom(after);
+            s.EndTurn();
+            if (s.IsOver) return Eval.Score(s, me);
+            int opp = s.Current;
+            _oppVisited.Clear();
+            _oppVisited.Add(s.Hash());
+            _oppNodes = 0;
+            _oppMe = me;
+            _oppBest = Eval.Score(s, opp);
+            _oppBestMine = Eval.Score(s, me);
+            OppDfs(0, opp);
+            return _oppBestMine;
+        }
+
+        private void OppDfs(int depth, int opp)
+        {
+            if (depth + 1 >= _oppPool.Length) return;
+            var s = _oppPool[depth];
+            var child = _oppPool[depth + 1];
+            var legal = _oppLegal[depth];
+            s.LegalActions(legal);
+            for (int i = 0; i < legal.Count; i++)
+            {
+                GameAction a = legal[i];
+                if (a.Type != ActionType.Attack) continue;
+                if (_oppNodes >= DeepReplyNodes) return;
+                child.CopyFrom(s);
+                child.Apply(a);
+                _oppNodes++;
+                if (!_oppVisited.Add(child.Hash())) continue;
+                double v = Eval.Score(child, opp);
+                if (v > _oppBest)
+                {
+                    _oppBest = v;
+                    _oppBestMine = Eval.Score(child, _oppMe);   // оценка не строго антисимметрична (веса доборов), берём мою
+                }
+                if (child.IsOver) continue;
+                OppDfs(depth + 1, opp);
+            }
         }
 
         private double TryAttack(GameState s, int id, int target, int opp)
