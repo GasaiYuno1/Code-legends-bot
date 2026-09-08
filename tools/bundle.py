@@ -6,7 +6,7 @@
   * все `using` стоят в начале файла — они собираются и выносятся наверх без дублей;
   * строки, начинающиеся с `//` (включая `///`), выбрасываются ради лимита размера CodinGame.
 
-Запуск: python3 tools/bundle.py  ->  build/codingame.cs
+Запуск: python3 tools/bundle.py  ->  dist/codingame.cs (файл отслеживается git — пересобирать перед пушем)
 """
 import re
 import sys
@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src" / "LocmBot"
-OUT = ROOT / "build" / "codingame.cs"
+OUT = ROOT / "dist" / "codingame.cs"
 
 USING_RE = re.compile(r"^\s*using\s+[\w.]+\s*;\s*$")
 COMMENT_LINE_RE = re.compile(r"^\s*//")  # строки-комментарии (в т.ч. /// doc) выбрасываем: у CodinGame лимит ~100k символов
