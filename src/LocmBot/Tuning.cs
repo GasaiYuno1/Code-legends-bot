@@ -60,6 +60,8 @@ namespace Locm
                     case "cand": search.MaxCandidates = (int)v; break;
                     case "deep": search.DeepReplyCandidates = (int)v; break;
                     case "deepnodes": search.DeepReplyNodes = (int)v; break;
+                    case "counter": search.CounterCandidates = (int)v; break;
+                    case "counternodes": search.CounterNodes = (int)v; break;
                     case "table": CardRating.UseTable = v != 0; break;
                     case "curvew": RatingDraft.CurveW = v; break;
                     case "maxitems": RatingDraft.MaxItems = (int)v; break;
