@@ -22,6 +22,13 @@ namespace Locm.Tests
                 }
                 return CandidateExport.Run(args[1], args[2], topK, step, ms);
             }
+            if (args.Length > 0 && args[0] == "replydata")
+            {
+                // replydata <логи> <out.tsv> [step=K]
+                int step = 1;
+                for (int i = 3; i < args.Length; i++) if (args[i].StartsWith("step=")) step = int.Parse(args[i].Substring(5));
+                return ReplyData.Run(new[] { args[1] }, args[2], step);
+            }
             if (args.Length > 0 && args[0] == "features")
                 return FeatureExport.Run(args[1], args.Length > 2 ? args[2] : "build/features.tsv");
             if (args.Length > 0 && args[0] == "bench")

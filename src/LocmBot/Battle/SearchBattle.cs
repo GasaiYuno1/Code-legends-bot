@@ -72,6 +72,10 @@ namespace Locm
         /// <summary>Бюджет прогрева JIT на первом ходу драфта, мс (0 — без прогрева; для быстрых локальных матчей).</summary>
         public int WarmUpMs = 400;
         /// <summary>Сколько лучших кандидатов после глубокого ответа оценить ещё и моим следующим ходом (3 полухода); 0 — выключено.</summary>
+        /// <summary>Поправка на реальный ответ противника (ReplyModel: матожидание по логам арены минус модель «только атаки»).</summary>
+        public bool UseReplyModel = false;
+        public double ReplyModelW = 1.0;
+        private readonly float[] _rmFeatures = new float[NetFeatures.Count];
         public int CounterCandidates = 0;
         /// <summary>4-й полуход: сколько лучших по статике листьев моего второго хода переоценить его ответом (0 — старый 3-полуходовый режим со статикой).</summary>
         public int CounterLeaves = 8;
@@ -432,6 +436,7 @@ namespace Locm
                 }
                 Candidate c = _heap[i];
                 double reply = ReplyScore(c.State, me);
+                if (UseReplyModel && reply > -Evaluator.WinScore / 2 && reply < Evaluator.WinScore / 2) reply += ReplyModelW * ReplyCorrection(c.State, me);
                 double stat = UseNet ? Leaf(c.State, me) : c.Static;
                 double final = ReplyWeight * reply + (1 - ReplyWeight) * stat;
                 if (i < _final.Length) _final[i] = final;
@@ -469,6 +474,7 @@ namespace Locm
                     _deepPhase = true;
                     double deep = DeepReplyScore(c.State, me);
                     _deepPhase = false;
+                    if (UseReplyModel && deep > -Evaluator.WinScore / 2 && deep < Evaluator.WinScore / 2) deep += ReplyModelW * ReplyCorrection(c.State, me);
                     bool netOnly = UseNet && NetEval.Available && NetDeepOnly;
                     double final = netOnly ? deep : ReplyWeight * deep + (1 - ReplyWeight) * (UseNet ? Leaf(c.State, me) : c.Static);
                     _final[order[i]] = final;
@@ -933,6 +939,36 @@ namespace Locm
             for (int i = 0; i < _fullBestLen; i++) sb.Append(' ').Append(_fullBestLine[i]).Append(';');
             sb.AppendLine();
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Поправка к оценке ответа: E[моя оценка после его реального хода] − оценка по модели «только атаки»,
+        /// линейная по NetFeatures позиции после моего хода, его мане и руке на его ход и произведениям (см. train_reply.py).
+        /// </summary>
+        public double ReplyCorrection(GameState after, int me)
+        {
+            var w = ReplyModel.W;
+            if (w.Length != ReplyModel.Features + 1) return 0;
+            var f = _rmFeatures;
+            NetFeatures.Extract(after, me, f);
+            var o = after.Players[1 - me];
+            var p = after.Players[me];
+            double oppMana = Math.Min(12, o.MaxMana + 1) / 12.0;
+            double oppHand = Math.Min(8, o.HandCount + o.NextTurnDraw) / 8.0;
+            double oppDeck = o.DeckSize / 30.0;
+            double myHand = p.HandCount / 8.0;
+            int k = 0;
+            double v = 0;
+            for (int i = 0; i < NetFeatures.Count; i++) v += w[k++] * f[i];
+            v += w[k++] * oppMana;
+            v += w[k++] * oppHand;
+            v += w[k++] * oppDeck;
+            v += w[k++] * myHand;
+            for (int i = 3; i <= 8; i++) v += w[k++] * f[i] * oppMana;
+            for (int i = 3; i <= 8; i++) v += w[k++] * f[i] * oppHand;
+            for (int i = 25; i <= 30; i++) v += w[k++] * f[i] * oppMana;
+            v += w[k];
+            return v;
         }
 
         /// <summary>Риск летала по картам с подготовкой образцов руки (для тестов и диагностики).</summary>

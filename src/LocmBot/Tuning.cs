@@ -85,6 +85,8 @@ namespace Locm
                     case "netdeep": search.NetDeepOnly = v != 0; break;
                     case "counternodes": search.CounterNodes = (int)v; break;
                     case "counterleaves": search.CounterLeaves = (int)v; break;
+                    case "replymodel": search.UseReplyModel = v != 0; break;
+                    case "replymodelw": search.ReplyModelW = v; break;
                     case "counterdeep": search.CounterDeep = v != 0; break;
                     case "counterattacks": search.CounterAttacksOnly = v != 0; break;
                     case "table": CardRating.UseTable = v != 0; break;
