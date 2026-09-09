@@ -73,6 +73,7 @@ namespace Locm
                     case "sampled": search.SampledCandidates = (int)v; break;
                     case "hands": search.SampledHands = (int)v; break;
                     case "samplednodes": search.SampledNodes = (int)v; break;
+                    case "samplecounter": search.SampledCounter = v != 0; break;
                     case "warmup": search.WarmUpMs = (int)v; break;
                     case "exactlethal": search.ExactLethalNodes = (int)v; break;
                     case "risk": search.LethalRiskCandidates = (int)v; break;

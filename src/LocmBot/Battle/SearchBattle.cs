@@ -59,6 +59,8 @@ namespace Locm
         public int SampledHands = 2;
         /// <summary>Лимит узлов полного хода противника на один образец.</summary>
         public int SampledNodes = 400;
+        /// <summary>После его полного хода с сэмплированной рукой — мой следующий ход (CounterScore; с CounterLeaves > 0 ещё и его атаки).</summary>
+        public bool SampledCounter = false;
         /// <summary>Лимит узлов точной проверки летала атаками (только в лицо и по Guard); 0 — только эвристика.</summary>
         public int ExactLethalNodes = 0;   // 200: точный перебор атак в лицо/по Guard подтверждает эвристику; self-play 388:412 (шум) — оставлена эвристика, проверенная ареной
         /// <summary>Сколько лучших кандидатов после глубокого ответа проверить на риск летала по картам противника; 0 — выключено.</summary>
@@ -828,7 +830,13 @@ namespace Locm
                 _sampledBest.CopyFrom(s);
                 FullDfs(0, ActionType.Pass, opp, SampledNodes);
                 if (k == 0) { _fullBestLen = _cBestLen; Array.Copy(_cBestLine, _fullBestLine, _cBestLen); }
-                sum += Leaf(_sampledBest, me);
+                if (SampledCounter && !_sampledBest.IsOver)
+                {
+                    // 3-й (и 4-й при CounterLeaves > 0) полуход: после его полного хода — мой следующий ход
+                    _replyBest.CopyFrom(_sampledBest);
+                    sum += CounterScore(me);
+                }
+                else sum += Leaf(_sampledBest, me);
                 samples++;
             }
             return samples == 0 ? DeepReplyScore(after, me) : sum / samples;
