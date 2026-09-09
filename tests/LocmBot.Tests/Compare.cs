@@ -234,7 +234,7 @@ namespace Locm.Tests
             var a = new SearchBattle();
             var b = new SearchBattle();
             Tuning.Apply(overrides, a, TextWriter.Null);
-            Tuning.Apply(new[] { "sampled=0" }, a, TextWriter.Null);
+            Tuning.Apply(new[] { "sampled=0", "replymodel=0" }, a, TextWriter.Null);   // A — без модели руки и без поправки на ответ
             Tuning.Apply(overrides, b, Console.Out);
             var files = new List<string>();
             foreach (var p in paths)
