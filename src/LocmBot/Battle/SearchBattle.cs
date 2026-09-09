@@ -824,6 +824,7 @@ namespace Locm
             int samples = 0;
             for (int k = 0; k < _preparedHands && _hands[k] != null; k++)
             {
+                if (k > 0 && _clock != null && _clock.TimeUp) break;   // на арене машина может быть медленнее: усредняем по тому, что успели
                 var s = _cPool[0];
                 s.CopyFrom(after);
                 s.EndTurn();
