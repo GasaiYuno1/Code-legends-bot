@@ -410,6 +410,12 @@ public int LethalRiskNodes = 300;
 public double LethalRiskW = 30.0;
 public int WarmUpMs = 400;
 public int CounterCandidates = 0;
+public int CounterLeaves = 8;
+public bool CounterDeep = false;
+public bool CounterAttacksOnly = false;
+private readonly GameState[] _cLeafStates = new GameState[16];
+private readonly double[] _cLeafScores = new double[16];
+private int _cLeafCount;
 public int CounterNodes = 1500;
 private readonly GameState[] _pool = new GameState[MaxDepth + 2];
 private readonly List<GameAction>[] _legal = new List<GameAction>[MaxDepth + 1];
@@ -494,6 +500,7 @@ _oppPool[i] = new GameState();
 _oppLegal[i] = new List<GameAction>(64);
 }
 for (int i = 0; i < _cPool.Length; i++) _cPool[i] = new GameState();
+for (int i = 0; i < _cLeafStates.Length; i++) _cLeafStates[i] = new GameState();
 for (int i = 0; i < _cLegal.Length; i++) _cLegal[i] = new List<GameAction>(64);
 }
 private long _lastMs;
@@ -1258,8 +1265,33 @@ _cVisited.Add(s.Hash());
 _cNodes = 0;
 _cRootBoard = s.Me.BoardCount;
 _cBest = Eval.Score(s, me);
+_cLeafCount = 0;
+if (CounterLeaves > 0) AddCounterLeaf(s, _cBest);
 CounterDfs(0, ActionType.Pass, me);
-return _cBest;
+if (CounterLeaves == 0) return _cBest;
+double best = double.NegativeInfinity;
+for (int i = 0; i < _cLeafCount; i++)
+{
+var leaf = _cLeafStates[i];
+double v = leaf.IsOver ? Eval.Score(leaf, me) : (CounterDeep ? DeepReplyScore(leaf, me) : ReplyScore(leaf, me));
+if (v > best) best = v;
+}
+return best;
+}
+private void AddCounterLeaf(GameState state, double score)
+{
+int cap = Math.Min(CounterLeaves, _cLeafStates.Length);
+if (_cLeafCount < cap)
+{
+_cLeafStates[_cLeafCount].CopyFrom(state);
+_cLeafScores[_cLeafCount++] = score;
+return;
+}
+int worst = 0;
+for (int i = 1; i < _cLeafCount; i++) if (_cLeafScores[i] < _cLeafScores[worst]) worst = i;
+if (score <= _cLeafScores[worst]) return;
+_cLeafStates[worst].CopyFrom(state);
+_cLeafScores[worst] = score;
 }
 private void CounterDfs(int depth, ActionType last, int me)
 {
@@ -1272,6 +1304,7 @@ for (int i = 0; i < legal.Count; i++)
 {
 GameAction a = legal[i];
 if (a.IsPass || !CounterAllowed(last, a.Type, s)) continue;
+if (CounterAttacksOnly && a.Type != ActionType.Attack) continue;
 if (_cNodes >= CounterNodes) return;
 child.CopyFrom(s);
 child.Apply(a);
@@ -1279,6 +1312,7 @@ _cNodes++;
 if (!_cVisited.Add(child.Hash())) continue;
 double v = Eval.Score(child, me);
 if (v > _cBest) _cBest = v;
+if (CounterLeaves > 0) AddCounterLeaf(child, v);
 if (child.IsOver)
 {
 if (child.Winner == me) { _cNodes = CounterNodes; return; }
@@ -2977,6 +3011,9 @@ case "netscale": search.NetScale = v; break;
 case "netadd": search.NetAdditive = v != 0; break;
 case "netdeep": search.NetDeepOnly = v != 0; break;
 case "counternodes": search.CounterNodes = (int)v; break;
+case "counterleaves": search.CounterLeaves = (int)v; break;
+case "counterdeep": search.CounterDeep = v != 0; break;
+case "counterattacks": search.CounterAttacksOnly = v != 0; break;
 case "table": CardRating.UseTable = v != 0; break;
 case "curvew": RatingDraft.CurveW = v; break;
 case "draftwin": CardTable.UseWinAdjusted = v != 0; break;
