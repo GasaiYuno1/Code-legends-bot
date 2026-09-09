@@ -42,7 +42,8 @@ python3 tools/arena/selfplay_cards.py --games 20000 --workers 4 --explore 0.25  
 tools/refcheck/run.sh <клон LegendsOfCodeAndMagic> [seed] [игр] [каталог] # новые логи движком арбитра (Java 17+)
 tools/refcheck/match.sh <клон> <игр> <seed> "<cmd A>" "<cmd B>" [логи]  # матчи; cmd = "dotnet src/LocmBot/bin/Release/net8.0/LocmBot.dll" или random
 python3 tools/gen_carddb.py                                              # referee/cardlist.txt -> Game/CardDb.cs
-python3 tools/bundle.py                                                  # -> dist/codingame.cs (без комментариев, чистый ASCII; файл в git — пересобирать перед пушем)
+python3 tools/bundle.py                                                  # -> dist/codingame.cs (без комментариев, чистый ASCII; файл в git — пересобирать перед пушем); блоки #if EXPERIMENTS вырезаются (локально они собираются: DefineConstants в csproj)
+dotnet build tools/bundlecheck -c Release                                # компиляция самой склейки отдельным проектом (обязательно перед заливкой)
 python3 tools/paste_page.py                                              # -> build/paste.html: страница «скопировать код» для телефона (публикуется как артефакт)
 python3 tools/arena/fetch.py --league 6 --agents 30 --max-games 1500     # партии арены -> data/arena/games.txt (дописывает новые)
 python3 tools/arena/fetch.py --handle <handle из URL профиля> --out build/user/games.txt   # бои одного игрока (свои: 712b3621df6ce65a3eff2bd78ab18e752899972)

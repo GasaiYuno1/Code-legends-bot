@@ -59,7 +59,16 @@ def main() -> int:
     bodies: list[str] = []
     for path in files:
         body_lines = []
+        skipping = False   # блоки `#if EXPERIMENTS` ... `#endif` (без вложенности) в склейку не попадают
         for line in path.read_text(encoding="utf-8").splitlines():
+            st = line.strip()
+            if st.startswith("#if EXPERIMENTS"):
+                skipping = True
+                continue
+            if skipping:
+                if st.startswith("#endif"):
+                    skipping = False
+                continue
             if USING_RE.match(line):
                 u = line.strip()
                 if u not in usings:
@@ -72,6 +81,8 @@ def main() -> int:
                 if line:
                     body_lines.append(line)
         rel = path.relative_to(ROOT).as_posix()
+        if not body_lines:
+            continue
         bodies.append(f"// ===== {rel} =====\n" + "\n".join(body_lines).strip("\n") + "\n")
 
     OUT.parent.mkdir(parents=True, exist_ok=True)

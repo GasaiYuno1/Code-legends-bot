@@ -10,6 +10,8 @@
     <AssemblyName>LocmBot</AssemblyName>
     <InvariantGlobalization>true</InvariantGlobalization>
     <TieredPGO>true</TieredPGO>
+    <!-- экспериментальный код (#if EXPERIMENTS) собирается локально, но вырезается из склейки tools/bundle.py -->
+    <DefineConstants>$(DefineConstants);EXPERIMENTS</DefineConstants>
   </PropertyGroup>
 
 </Project>

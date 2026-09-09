@@ -403,12 +403,16 @@ public int DeepReplyNodes = 400;
 public int SampledCandidates = 0;
 public int SampledHands = 2;
 public int SampledNodes = 400;
+public bool SampledCounter = false;
 public int ExactLethalNodes = 0;
 public int LethalRiskCandidates = 0;
 public int LethalRiskHands = 4;
 public int LethalRiskNodes = 300;
 public double LethalRiskW = 30.0;
 public int WarmUpMs = 400;
+public bool UseReplyModel = false;
+public double ReplyModelW = 1.0;
+private readonly float[] _rmFeatures = new float[NetFeatures.Count];
 public int CounterCandidates = 0;
 public int CounterLeaves = 8;
 public bool CounterDeep = false;
@@ -770,42 +774,6 @@ bestIdx = order[i];
 }
 }
 if (bestIdx < 0) return;
-if (LethalRiskCandidates > 0 && LethalRiskHands > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver
-&& _heap[bestIdx].State.Players[1 - me].HandCount + 1 > 0)
-{
-int k = Math.Min(deepDone, LethalRiskCandidates);
-for (int i = 0; i < k; i++)
-{
-int best = i;
-for (int j = i + 1; j < deepDone; j++) if (_final[order[j]] > _final[order[best]]) best = j;
-int t = order[i]; order[i] = order[best]; order[best] = t;
-}
-PrepareHands(_heap[order[0]].State, me, LethalRiskHands);
-double bestR = double.NegativeInfinity;
-int bestRIdx = -1;
-for (int i = 0; i < k; i++)
-{
-if (_clock.TimeUp) { TimedOut = true; break; }
-Candidate c = _heap[order[i]];
-double f = _final[order[i]];
-if (f > -Evaluator.WinScore / 2 && f < Evaluator.WinScore / 2)
-{
-f -= LethalRiskW * LethalRisk(c.State, me);
-_final[order[i]] = f;
-RiskScored++;
-}
-if (f > bestR)
-{
-bestR = f;
-bestRIdx = order[i];
-}
-}
-if (bestRIdx >= 0)
-{
-bestFinal = bestR;
-bestIdx = bestRIdx;
-}
-}
 if (SampledCandidates > 0 && SampledHands > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver)
 {
 int k = Math.Min(deepDone, SampledCandidates);
@@ -895,7 +863,6 @@ for (int i = 0; i < o.BoardCount; i++) totalAttack += o.Board[i].Attack;
 int guardDefense = 0;
 for (int i = 0; i < p.BoardCount; i++)
 if (p.Board[i].Has(Abilities.Guard)) guardDefense += p.Board[i].Defense;
-if (totalAttack - guardDefense >= p.Health && (ExactLethalNodes == 0 || AttackLethal(after, me, ExactLethalNodes))) return -Evaluator.WinScore;
 int n = o.BoardCount;
 for (int i = 0; i < n; i++) _order[i] = i;
 for (int i = 1; i < n; i++)
@@ -938,13 +905,6 @@ s.CopyFrom(after);
 s.EndTurn();
 if (s.IsOver) return Leaf(s, me);
 int opp = s.Current;
-if (ExactLethalNodes > 0 && AttackLethal(after, me, ExactLethalNodes))
-{
-_replyBest.CopyFrom(_sampledBest);
-_oppBestLen = Math.Min(_cBestLen, _oppBestLine.Length);
-Array.Copy(_cBestLine, _oppBestLine, _oppBestLen);
-return Leaf(_sampledBest, me);
-}
 _oppVisited.Clear();
 _oppVisited.Add(s.Hash());
 _oppNodes = 0;
@@ -955,37 +915,6 @@ _replyBest.CopyFrom(s);
 _oppBestLen = 0;
 OppDfs(0, opp);
 return _oppBestMine;
-}
-public List<GameState> CollectCandidates(GameState root, TurnClock clock, int topK)
-{
-_clock = clock;
-_phase1Deadline = clock.ElapsedMs + clock.RemainingMs;
-_stop = false;
-_won = false;
-TimedOut = false;
-_nodes = 0;
-_heapCount = 0;
-EnsureHeap();
-_visited.Clear();
-_pool[0].CopyFrom(root);
-int me = _pool[0].Current;
-_rootBoard = _pool[0].Me.BoardCount;
-_best = Eval.Score(_pool[0], me);
-_bestLen = 0;
-_visited.Add(_pool[0].Hash());
-_line[0] = GameAction.Pass;
-AddCandidate(_pool[0], _best, 0);
-Dfs(0);
-int n = _heapCount;
-Array.Sort(_heap, 0, n, StaticDesc.Instance);
-var result = new List<GameState>();
-for (int i = 0; i < n && i < topK; i++)
-{
-if (_heap[i].State.IsOver) continue;
-result.Add(_heap[i].State.Clone());
-}
-_heapCount = 0;
-return result;
 }
 public GameState ReplyState(GameState after, int me)
 {
@@ -1061,143 +990,15 @@ _cBestLen = 0;
 _sampledBest.CopyFrom(s);
 FullDfs(0, ActionType.Pass, opp, SampledNodes);
 if (k == 0) { _fullBestLen = _cBestLen; Array.Copy(_cBestLine, _fullBestLine, _cBestLen); }
-sum += Leaf(_sampledBest, me);
+if (SampledCounter && !_sampledBest.IsOver)
+{
+_replyBest.CopyFrom(_sampledBest);
+sum += CounterScore(me);
+}
+else sum += Leaf(_sampledBest, me);
 samples++;
 }
 return samples == 0 ? DeepReplyScore(after, me) : sum / samples;
-}
-public double LethalRisk(GameState after, int me)
-{
-if (after.IsOver) return after.Winner == me ? 0.0 : 1.0;
-int lethal = 0, samples = 0;
-for (int k = 0; k < _preparedHands && _hands[k] != null; k++)
-{
-var s = _cPool[0];
-s.CopyFrom(after);
-s.EndTurn();
-samples++;
-if (s.IsOver) { if (s.Winner != me) lethal++; continue; }
-int opp = s.Current;
-var o = s.Players[opp];
-o.HandKnown = 0;
-int give = Math.Min(o.HandCount, _handLen[k]);
-for (int i = 0; i < give; i++) o.Hand[o.HandKnown++] = _hands[k][i];
-_cVisited.Clear();
-_cVisited.Add(s.Hash());
-_cNodes = 0;
-_cRootBoard = o.BoardCount;
-_sampledPlayer = opp;
-_sampledEval = OppEval;
-_cBest = OppEval.Score(s, opp);
-_cBestLen = 0;
-_sampledBest.CopyFrom(s);
-_lethalOnly = true;
-FullDfs(0, ActionType.Pass, opp, LethalRiskNodes);
-_lethalOnly = false;
-if (_sampledBest.IsOver && _sampledBest.Winner == opp)
-{
-lethal++;
-_fullBestLen = _cBestLen;
-Array.Copy(_cBestLine, _fullBestLine, _cBestLen);
-}
-}
-return samples == 0 ? 0.0 : (double)lethal / samples;
-}
-public bool AttackLethal(GameState after, int me, int nodeCap)
-{
-if (after.IsOver) return after.Winner != me;
-var s = _cPool[0];
-s.CopyFrom(after);
-s.EndTurn();
-if (s.IsOver) return s.Winner != me;
-int opp = s.Current;
-var o = s.Players[opp];
-o.HandKnown = 0;
-_cVisited.Clear();
-_cVisited.Add(s.Hash());
-_cNodes = 0;
-_cRootBoard = o.BoardCount;
-_sampledPlayer = opp;
-_sampledEval = OppEval;
-_cBest = OppEval.Score(s, opp);
-_cBestLen = 0;
-_sampledBest.CopyFrom(s);
-_lethalOnly = true;
-FullDfs(0, ActionType.Pass, opp, nodeCap);
-_lethalOnly = false;
-return _sampledBest.IsOver && _sampledBest.Winner == opp;
-}
-public bool GreedyLethal(GameState after, int me)
-{
-if (after.IsOver) return after.Winner != me;
-var s = _cPool[0];
-s.CopyFrom(after);
-s.EndTurn();
-if (s.IsOver) return s.Winner != me;
-var o = s.Players[s.Current];
-var p = s.Players[me];
-int totalAttack = 0;
-for (int i = 0; i < o.BoardCount; i++) totalAttack += o.Board[i].Attack;
-int guardDefense = 0;
-for (int i = 0; i < p.BoardCount; i++)
-if (p.Board[i].Has(Abilities.Guard)) guardDefense += p.Board[i].Defense;
-return totalAttack - guardDefense >= p.Health;
-}
-public string DescribeRisk()
-{
-var sb = new System.Text.StringBuilder();
-for (int k = 0; k < _preparedHands; k++)
-{
-sb.Append("   hand ").Append(k).Append(':');
-for (int i = 0; i < _handLen[k]; i++) sb.Append(' ').Append(_hands[k][i].Number).Append('/').Append(_hands[k][i].Cost).Append('m');
-sb.AppendLine();
-}
-sb.Append("   lethal line:");
-for (int i = 0; i < _fullBestLen; i++) sb.Append(' ').Append(_fullBestLine[i]).Append(';');
-sb.AppendLine();
-return sb.ToString();
-}
-public double LethalRiskScore(GameState after, int me)
-{
-PrepareHands(after, me, LethalRiskHands);
-return LethalRisk(after, me);
-}
-private static bool LethalUseful(GameState s, GameAction a, int player)
-{
-var p = s.Players[player];
-var enemy = s.Players[1 - player];
-switch (a.Type)
-{
-case ActionType.Summon:
-{
-int h = p.FindHand(a.Id);
-if (h < 0) return false;
-var c = p.Hand[h];
-return (c.Abilities & Abilities.Charge) != 0 || c.OpponentHealthChange < 0;
-}
-case ActionType.Attack:
-{
-if (a.Target < 0) return true;
-int t = enemy.FindCreature(a.Target);
-return t >= 0 && enemy.Board[t].Has(Abilities.Guard);
-}
-case ActionType.Use:
-{
-int h = p.FindHand(a.Id);
-if (h < 0) return false;
-var c = p.Hand[h];
-if (c.Type == CardType.GreenItem)
-{
-int t = p.FindCreature(a.Target);
-return t >= 0 && p.Board[t].CanAttack && !p.Board[t].HasAttacked;
-}
-if (a.Target < 0) return c.Type == CardType.BlueItem;
-int e = enemy.FindCreature(a.Target);
-return e >= 0 && enemy.Board[e].Has(Abilities.Guard);
-}
-default:
-return false;
-}
 }
 private void FullDfs(int depth, ActionType last, int player, int nodeCap)
 {
@@ -1212,7 +1013,6 @@ for (int i = 0; i < legal.Count && n < kids.Length; i++)
 {
 GameAction a = legal[i];
 if (a.IsPass || !CounterAllowed(last, a.Type, s)) continue;
-if (_lethalOnly && !LethalUseful(s, a, player)) continue;
 if (_cNodes >= nodeCap) break;
 child.CopyFrom(s);
 child.Apply(a);
@@ -3000,12 +2800,8 @@ case "counter": search.CounterCandidates = (int)v; break;
 case "sampled": search.SampledCandidates = (int)v; break;
 case "hands": search.SampledHands = (int)v; break;
 case "samplednodes": search.SampledNodes = (int)v; break;
+case "samplecounter": search.SampledCounter = v != 0; break;
 case "warmup": search.WarmUpMs = (int)v; break;
-case "exactlethal": search.ExactLethalNodes = (int)v; break;
-case "risk": search.LethalRiskCandidates = (int)v; break;
-case "riskw": search.LethalRiskW = v; break;
-case "riskhands": search.LethalRiskHands = (int)v; break;
-case "risknodes": search.LethalRiskNodes = (int)v; break;
 case "net": search.UseNet = v != 0; break;
 case "netscale": search.NetScale = v; break;
 case "netadd": search.NetAdditive = v != 0; break;

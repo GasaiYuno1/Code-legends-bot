@@ -438,7 +438,9 @@ namespace Locm
                 }
                 Candidate c = _heap[i];
                 double reply = ReplyScore(c.State, me);
+#if EXPERIMENTS
                 if (UseReplyModel && reply > -Evaluator.WinScore / 2 && reply < Evaluator.WinScore / 2) reply += ReplyModelW * ReplyCorrection(c.State, me);
+#endif
                 double stat = UseNet ? Leaf(c.State, me) : c.Static;
                 double final = ReplyWeight * reply + (1 - ReplyWeight) * stat;
                 if (i < _final.Length) _final[i] = final;
@@ -476,7 +478,9 @@ namespace Locm
                     _deepPhase = true;
                     double deep = DeepReplyScore(c.State, me);
                     _deepPhase = false;
+#if EXPERIMENTS
                     if (UseReplyModel && deep > -Evaluator.WinScore / 2 && deep < Evaluator.WinScore / 2) deep += ReplyModelW * ReplyCorrection(c.State, me);
+#endif
                     bool netOnly = UseNet && NetEval.Available && NetDeepOnly;
                     double final = netOnly ? deep : ReplyWeight * deep + (1 - ReplyWeight) * (UseNet ? Leaf(c.State, me) : c.Static);
                     _final[order[i]] = final;
@@ -490,6 +494,7 @@ namespace Locm
                 }
                 if (bestIdx < 0) return;
 
+#if EXPERIMENTS
                 // уровень 3б: риск летала по картам противника — доля образцов его руки, в которых он выигрывает следующим ходом
                 if (LethalRiskCandidates > 0 && LethalRiskHands > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver
                     && _heap[bestIdx].State.Players[1 - me].HandCount + 1 > 0)
@@ -527,6 +532,7 @@ namespace Locm
                         bestIdx = bestRIdx;
                     }
                 }
+#endif
 
                 // уровень 3а: лучшие после глубокого ответа — полный ход противника с сэмплированной рукой (expectimax)
                 if (SampledCandidates > 0 && SampledHands > 0 && !_clock.TimeUp && !_heap[bestIdx].State.IsOver)
@@ -630,7 +636,11 @@ namespace Locm
             for (int i = 0; i < p.BoardCount; i++)
                 if (p.Board[i].Has(Abilities.Guard)) guardDefense += p.Board[i].Defense;
             // эвристика ошибается при Ward/Lethal/Breakthrough у стражей — подтверждаем точным перебором атак в лицо и по Guard
+#if EXPERIMENTS
             if (totalAttack - guardDefense >= p.Health && (ExactLethalNodes == 0 || AttackLethal(after, me, ExactLethalNodes))) return -Evaluator.WinScore;
+#else
+            if (totalAttack - guardDefense >= p.Health) return -Evaluator.WinScore;
+#endif
 
             // порядок: по убыванию атаки
             int n = o.BoardCount;
@@ -681,6 +691,7 @@ namespace Locm
             s.EndTurn();
             if (s.IsOver) return Leaf(s, me);
             int opp = s.Current;
+#if EXPERIMENTS
             // точный летал атаками (перебор по OppEval с лимитом узлов может его не найти)
             if (ExactLethalNodes > 0 && AttackLethal(after, me, ExactLethalNodes))
             {
@@ -689,6 +700,7 @@ namespace Locm
                 Array.Copy(_cBestLine, _oppBestLine, _oppBestLen);
                 return Leaf(_sampledBest, me);
             }
+#endif
             _oppVisited.Clear();
             _oppVisited.Add(s.Hash());
             _oppNodes = 0;
@@ -701,6 +713,7 @@ namespace Locm
             return _oppBestMine;
         }
 
+#if EXPERIMENTS
         /// <summary>
         /// Для обучения: кандидаты после моего хода (лучшие topK по статике из этапа 1), копии состояний.
         /// </summary>
@@ -735,6 +748,7 @@ namespace Locm
             _heapCount = 0;
             return result;
         }
+#endif
 
         /// <summary>Для обучения: состояние после лучшего (для противника) ответа атаками на моё состояние after; null — партия окончена.</summary>
         public GameState ReplyState(GameState after, int me)
@@ -842,6 +856,7 @@ namespace Locm
             return samples == 0 ? DeepReplyScore(after, me) : sum / samples;
         }
 
+#if EXPERIMENTS
         /// <summary>
         /// Риск летала по картам: доля подготовленных образцов руки противника, в которых после моего хода он выигрывает
         /// своим следующим ходом. Поиск только по действиям, ведущим к урону в лицо (Charge/урон при призыве, предметы в лицо
@@ -885,7 +900,9 @@ namespace Locm
             }
             return samples == 0 ? 0.0 : (double)lethal / samples;
         }
+#endif
 
+#if EXPERIMENTS
         /// <summary>
         /// Точная проверка летала атаками с его стола (без карт): перебор только атак в лицо и по моим Guard,
         /// с дедупликацией и лимитом узлов. Состояние after — после моего хода, до его EndTurn.
@@ -914,7 +931,9 @@ namespace Locm
             _lethalOnly = false;
             return _sampledBest.IsOver && _sampledBest.Winner == opp;
         }
+#endif
 
+#if EXPERIMENTS
         /// <summary>Эвристика уровня 1: сумма его атак минус защита моих Guard ≥ моё HP (после его EndTurn).</summary>
         public bool GreedyLethal(GameState after, int me)
         {
@@ -932,7 +951,9 @@ namespace Locm
                 if (p.Board[i].Has(Abilities.Guard)) guardDefense += p.Board[i].Defense;
             return totalAttack - guardDefense >= p.Health;
         }
+#endif
 
+#if EXPERIMENTS
         /// <summary>Диагностика: подготовленные образцы руки противника и последняя найденная линия летала.</summary>
         public string DescribeRisk()
         {
@@ -948,7 +969,9 @@ namespace Locm
             sb.AppendLine();
             return sb.ToString();
         }
+#endif
 
+#if EXPERIMENTS
         /// <summary>
         /// Поправка к оценке ответа: E[моя оценка после его реального хода] − оценка по модели «только атаки»,
         /// линейная по NetFeatures позиции после моего хода, его мане и руке на его ход и произведениям (см. train_reply.py).
@@ -978,14 +1001,18 @@ namespace Locm
             v += w[k];
             return v;
         }
+#endif
 
+#if EXPERIMENTS
         /// <summary>Риск летала по картам с подготовкой образцов руки (для тестов и диагностики).</summary>
         public double LethalRiskScore(GameState after, int me)
         {
             PrepareHands(after, me, LethalRiskHands);
             return LethalRisk(after, me);
         }
+#endif
 
+#if EXPERIMENTS
         /// <summary>Действие игрока player, которое может приблизить летал (для _lethalOnly).</summary>
         private static bool LethalUseful(GameState s, GameAction a, int player)
         {
@@ -1024,6 +1051,7 @@ namespace Locm
                     return false;
             }
         }
+#endif
 
         /// <summary>
         /// Ограниченный перебор полного хода игрока player (фазы как в основном поиске), лучший узел по _sampledEval → _sampledBest.
@@ -1042,7 +1070,9 @@ namespace Locm
             {
                 GameAction a = legal[i];
                 if (a.IsPass || !CounterAllowed(last, a.Type, s)) continue;
+#if EXPERIMENTS
                 if (_lethalOnly && !LethalUseful(s, a, player)) continue;
+#endif
                 if (_cNodes >= nodeCap) break;
                 child.CopyFrom(s);
                 child.Apply(a);

@@ -75,19 +75,33 @@ namespace Locm
                     case "samplednodes": search.SampledNodes = (int)v; break;
                     case "samplecounter": search.SampledCounter = v != 0; break;
                     case "warmup": search.WarmUpMs = (int)v; break;
+#if EXPERIMENTS
                     case "exactlethal": search.ExactLethalNodes = (int)v; break;
+#endif
+#if EXPERIMENTS
                     case "risk": search.LethalRiskCandidates = (int)v; break;
+#endif
+#if EXPERIMENTS
                     case "riskw": search.LethalRiskW = v; break;
+#endif
+#if EXPERIMENTS
                     case "riskhands": search.LethalRiskHands = (int)v; break;
+#endif
+#if EXPERIMENTS
                     case "risknodes": search.LethalRiskNodes = (int)v; break;
+#endif
                     case "net": search.UseNet = v != 0; break;
                     case "netscale": search.NetScale = v; break;
                     case "netadd": search.NetAdditive = v != 0; break;
                     case "netdeep": search.NetDeepOnly = v != 0; break;
                     case "counternodes": search.CounterNodes = (int)v; break;
                     case "counterleaves": search.CounterLeaves = (int)v; break;
+#if EXPERIMENTS
                     case "replymodel": search.UseReplyModel = v != 0; break;
+#endif
+#if EXPERIMENTS
                     case "replymodelw": search.ReplyModelW = v; break;
+#endif
                     case "counterdeep": search.CounterDeep = v != 0; break;
                     case "counterattacks": search.CounterAttacksOnly = v != 0; break;
                     case "table": CardRating.UseTable = v != 0; break;
