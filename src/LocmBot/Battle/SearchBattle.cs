@@ -54,13 +54,13 @@ namespace Locm
         /// <summary>Лимит узлов перебора атак противника на одного кандидата.</summary>
         public int DeepReplyNodes = 400;
         /// <summary>Сколько лучших кандидатов после глубокого ответа переоценить полным ходом противника с сэмплированной рукой; 0 — выключено.</summary>
-        public int SampledCandidates = 0;
+        public int SampledCandidates = 6;
         /// <summary>Число образцов руки противника (одинаковые для всех кандидатов хода).</summary>
-        public int SampledHands = 2;
+        public int SampledHands = 8;
         /// <summary>Лимит узлов полного хода противника на один образец.</summary>
         public int SampledNodes = 400;
         /// <summary>После его полного хода с сэмплированной рукой — мой следующий ход (CounterScore; с CounterLeaves > 0 ещё и его атаки).</summary>
-        public bool SampledCounter = false;
+        public bool SampledCounter = true;
         /// <summary>Лимит узлов точной проверки летала атаками (только в лицо и по Guard); 0 — только эвристика.</summary>
         public int ExactLethalNodes = 0;   // 200: точный перебор атак в лицо/по Guard подтверждает эвристику; self-play 388:412 (шум) — оставлена эвристика, проверенная ареной
         /// <summary>Сколько лучших кандидатов после глубокого ответа проверить на риск летала по картам противника; 0 — выключено.</summary>
@@ -89,7 +89,7 @@ namespace Locm
         private readonly double[] _cLeafScores = new double[16];
         private int _cLeafCount;   // 8: совпадение с Legend 55.4% → 47.4%, self-play 16:14, до 94 мс — выключено (эффект горизонта: на листьях моего хода нет ответа противника)
         /// <summary>Лимит узлов перебора моего следующего хода на одного кандидата.</summary>
-        public int CounterNodes = 1500;
+        public int CounterNodes = 400;
 
         private readonly GameState[] _pool = new GameState[MaxDepth + 2];
         private readonly List<GameAction>[] _legal = new List<GameAction>[MaxDepth + 1];
